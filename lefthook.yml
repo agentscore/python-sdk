@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  commands:
+    ruff-check:
+      glob: "**/*.py"
+      run: uv run ruff check {staged_files}
+    ruff-format:
+      glob: "**/*.py"
+      run: uv run ruff format --check {staged_files}
+
+pre-push:
+  commands:
+    vulture:
+      run: uv run vulture . vulture_whitelist.py --min-confidence 80 --exclude .venv
