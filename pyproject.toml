@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentscore-py"
+version = "1.0.0"
+description = "Python client for the AgentScore trust and reputation API"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+keywords = ["agentscore", "x402", "erc-8004", "agent", "trust", "reputation", "wallet", "blockchain", "ai-agent", "agentic-payments"]
+dependencies = [
+    "httpx>=0.25.0,<1.0.0",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://docs.agentscore.sh"
+Repository = "https://github.com/agentscore/python-sdk"
+Issues = "https://github.com/agentscore/python-sdk/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "respx>=0.21",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentscore"]
+
+[dependency-groups]
+dev = [
+    "vulture>=2.15",
+]
