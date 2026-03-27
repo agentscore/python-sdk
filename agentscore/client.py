@@ -12,7 +12,7 @@ if TYPE_CHECKING:
         AgentsListResponse,
         AssessResponse,
         DecisionPolicy,
-        ReputationResponse,
+        ReputationResponseFull,
         StatsResponse,
     )
 
@@ -86,10 +86,10 @@ class AgentScore:
 
     # --- Sync methods ---
 
-    def get_reputation(self, address: str, chain: str = "base") -> ReputationResponse:
-        """Get cached reputation for an address (free, read-only)."""
+    def get_reputation(self, address: str, chain: str | None = None) -> ReputationResponseFull:
+        """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
         params: dict[str, str] = {}
-        if chain != "base":
+        if chain:
             params["chain"] = chain
         client = self._get_sync_client()
         response = client.get(f"/v1/reputation/{address}", params=params)
@@ -98,13 +98,13 @@ class AgentScore:
     def assess(
         self,
         address: str,
-        chain: str = "base",
+        chain: str | None = None,
         refresh: bool = False,
         policy: DecisionPolicy | None = None,
     ) -> AssessResponse:
         """Assess a wallet (paid, writes score on-the-fly)."""
         body: dict[str, Any] = {"address": address}
-        if chain != "base":
+        if chain:
             body["chain"] = chain
         if refresh:
             body["refresh"] = True
@@ -115,7 +115,7 @@ class AgentScore:
         return self._handle_response(response)
 
     def get_agents(self, **filters: Any) -> AgentsListResponse:
-        """Browse ERC-8004 agents (free)."""
+        """Browse agents (free)."""
         params = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in filters.items() if v is not None}
         client = self._get_sync_client()
         response = client.get("/v1/agents", params=params)
@@ -129,10 +129,10 @@ class AgentScore:
 
     # --- Async methods ---
 
-    async def aget_reputation(self, address: str, chain: str = "base") -> ReputationResponse:
-        """Get cached reputation for an address (free, read-only)."""
+    async def aget_reputation(self, address: str, chain: str | None = None) -> ReputationResponseFull:
+        """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
         params: dict[str, str] = {}
-        if chain != "base":
+        if chain:
             params["chain"] = chain
         client = self._get_async_client()
         response = await client.get(f"/v1/reputation/{address}", params=params)
@@ -141,13 +141,13 @@ class AgentScore:
     async def aassess(
         self,
         address: str,
-        chain: str = "base",
+        chain: str | None = None,
         refresh: bool = False,
         policy: DecisionPolicy | None = None,
     ) -> AssessResponse:
         """Assess a wallet (paid, writes score on-the-fly)."""
         body: dict[str, Any] = {"address": address}
-        if chain != "base":
+        if chain:
             body["chain"] = chain
         if refresh:
             body["refresh"] = True
@@ -158,7 +158,7 @@ class AgentScore:
         return self._handle_response(response)
 
     async def aget_agents(self, **filters: Any) -> AgentsListResponse:
-        """Browse ERC-8004 agents (free)."""
+        """Browse agents (free)."""
         params = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in filters.items() if v is not None}
         client = self._get_async_client()
         response = await client.get("/v1/agents", params=params)
