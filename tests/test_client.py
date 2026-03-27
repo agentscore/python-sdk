@@ -96,24 +96,23 @@ def test_get_reputation_success():
 
 
 @respx.mock
-def test_get_reputation_with_non_default_chain():
+def test_get_reputation_no_chain_param():
     route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
         return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
     )
     client = AgentScore(api_key=API_KEY)
-    client.get_reputation(ADDRESS, chain="ethereum")
-    assert "chain=ethereum" in str(route.calls.last.request.url)
+    client.get_reputation(ADDRESS)
+    assert "chain" not in str(route.calls.last.request.url)
 
 
 @respx.mock
-def test_get_reputation_default_chain_omitted_from_params():
+def test_get_reputation_with_chain():
     route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
         return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
     )
     client = AgentScore(api_key=API_KEY)
     client.get_reputation(ADDRESS, chain="base")
-    # chain=base should NOT be included in the query string
-    assert "chain" not in str(route.calls.last.request.url)
+    assert "chain=base" in str(route.calls.last.request.url)
 
 
 @respx.mock
@@ -201,10 +200,10 @@ def test_assess_with_non_default_chain():
 
 
 @respx.mock
-def test_assess_default_chain_omitted_from_body():
+def test_assess_no_chain_omits_from_body():
     route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
-    client.assess(ADDRESS, chain="base")
+    client.assess(ADDRESS)
     body = json.loads(route.calls.last.request.content)
     assert "chain" not in body
 

@@ -32,21 +32,10 @@ class Score(TypedDict):
     version: str
 
 
-class ERC8004Identity(TypedDict, total=False):
-    chain: str
-    token_id: int
-    registry_contract: str | None
-    name: str | None
-    description: str | None
-    metadata_quality: str | None
-    endpoint_count: int
-
-
 class Identity(TypedDict):
     ens_name: str | None
     website_url: str | None
     github_url: str | None
-    erc8004: ERC8004Identity | None
 
 
 class Activity(TypedDict):
@@ -65,6 +54,21 @@ class Activity(TypedDict):
     last_verified_tx_at: str | None
 
 
+class OperatorScore(TypedDict):
+    score: int
+    grade: Grade
+    agent_count: int
+    chains_active: list[str]
+
+
+class AgentSummary(TypedDict):
+    token_id: int
+    chain: str
+    name: str | None
+    score: int
+    grade: Grade
+
+
 class ReputationResponse(TypedDict):
     subject: Subject
     classification: Classification
@@ -75,6 +79,11 @@ class ReputationResponse(TypedDict):
     data_semantics: str
     caveats: list[str]
     updated_at: str | None
+
+
+class ReputationResponseFull(ReputationResponse, total=False):
+    operator_score: OperatorScore
+    agents: list[AgentSummary]
 
 
 class DecisionPolicy(TypedDict, total=False):

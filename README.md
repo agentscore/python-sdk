@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/agentscore-py.svg)](https://pypi.org/project/agentscore-py/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Python client for the [AgentScore](https://agentscore.sh) trust and reputation API. Score, verify, and assess AI agent wallets in the [x402](https://github.com/coinbase/x402) payment ecosystem and [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) agent registry.
+Python client for the [AgentScore](https://agentscore.sh) trust and reputation API.
 
 ## Install
 
@@ -16,29 +16,40 @@ pip install agentscore-py
 ```python
 from agentscore import AgentScore
 
-client = AgentScore(api_key="ask_...")
+client = AgentScore(api_key="as_live_...")
 
-# Free reputation lookup
+# Look up cached reputation (free)
 rep = client.get_reputation("0x1234...")
-print(rep["grade"], rep["score"])
+print(rep["score"]["value"], rep["score"]["grade"])
 
-# Trust decision with policy
-decision = client.get_decision("0x1234...", min_grade="C", min_transactions=5)
-print(decision["decision"]["allow"])
+# Filter to a specific chain
+base_rep = client.get_reputation("0x1234...", chain="base")
+
+# On-the-fly assessment with policy (paid)
+result = client.assess("0x1234...", policy={"min_grade": "B", "min_score": 35})
+print(result["decision"], result["decision_reasons"])
+
+# Browse agents
+agents = client.get_agents(chain="base", limit=10)
+print(len(agents["items"]), agents["count"])
+
+# Ecosystem stats
+stats = client.get_stats()
+print(stats["erc8004"]["known_agents"])
 ```
 
 ### Async
 
 ```python
-async with AgentScore(api_key="ask_...") as client:
+async with AgentScore(api_key="as_live_...") as client:
     rep = await client.aget_reputation("0x1234...")
-    print(rep["grade"])
+    result = await client.aassess("0x1234...", policy={"min_grade": "B"})
 ```
 
 ### Context Manager
 
 ```python
-with AgentScore(api_key="ask_...") as client:
+with AgentScore(api_key="as_live_...") as client:
     rep = client.get_reputation("0x1234...")
 ```
 
@@ -64,8 +75,6 @@ except AgentScoreError as e:
 ## Documentation
 
 - [API Reference](https://docs.agentscore.sh)
-- [ERC-8004 Standard](https://eips.ethereum.org/EIPS/eip-8004)
-- [x402 Protocol](https://github.com/coinbase/x402)
 
 ## License
 
