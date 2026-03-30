@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
 Grade = Literal["A", "B", "C", "D", "F"]
 EntityType = Literal["agent", "service", "hybrid", "wallet", "bot", "unknown"]
@@ -54,6 +54,42 @@ class Activity(TypedDict):
     last_verified_tx_at: str | None
 
 
+class Reputation(TypedDict):
+    feedback_count: int
+    client_count: int
+    trust_avg: float | None
+    uptime_avg: float | None
+    activity_avg: float | None
+    last_feedback_at: str | None
+
+
+class EvidenceSummary(TypedDict, total=False):
+    candidate_tx_count: int
+    confirmed_or_likely_tx: int
+    endpoint_count: int
+    github_stars: int
+    github_url: str | None
+    has_a2a_agent_card: bool
+    has_ens: bool
+    has_github: bool
+    has_website: bool
+    healthy_endpoints: int
+    is_erc8004: bool
+    metadata_kind: str | None
+    metadata_quality: str | None
+    multi_chain_count: int
+    reputation_feedback_count: int
+    reputation_trust_avg: float | None
+    reputation_uptime_avg: float | None
+    reputation_activity_avg: float | None
+    reputation_client_count: int
+    verified_tx_count: int
+    website_mentions_mcp: bool
+    website_mentions_x402: bool
+    website_reachable: bool
+    website_url: str | None
+
+
 class OperatorScore(TypedDict):
     score: int
     grade: Grade
@@ -75,7 +111,7 @@ class ReputationResponse(TypedDict):
     score: Score
     identity: Identity | None
     activity: Activity | None
-    evidence_summary: dict[str, Any] | None
+    evidence_summary: EvidenceSummary | None
     data_semantics: str
     caveats: list[str]
     updated_at: str | None
@@ -84,6 +120,7 @@ class ReputationResponse(TypedDict):
 class ReputationResponseFull(ReputationResponse, total=False):
     operator_score: OperatorScore
     agents: list[AgentSummary]
+    reputation: Reputation
 
 
 class DecisionPolicy(TypedDict, total=False):
@@ -98,7 +135,7 @@ class AssessResponse(TypedDict):
     score: Score
     identity: Identity | None
     activity: Activity | None
-    evidence_summary: dict[str, Any] | None
+    evidence_summary: EvidenceSummary | None
     data_semantics: str
     caveats: list[str]
     updated_at: str | None
