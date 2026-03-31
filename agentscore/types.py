@@ -8,7 +8,7 @@ ReputationStatus = Literal["unknown", "known_unscored", "scored", "stale", "inde
 
 
 class Subject(TypedDict):
-    chain: str
+    chains: list[str]
     address: str
 
 
@@ -23,12 +23,20 @@ class Classification(TypedDict):
 
 
 class Score(TypedDict):
+    value: int | None
+    grade: Grade | None
+    scored_at: str | None
     status: ReputationStatus
+    version: str
+
+
+class ChainScore(TypedDict):
     value: int | None
     grade: Grade | None
     confidence: float | None
     dimensions: dict[str, float] | None
     scored_at: str | None
+    status: ReputationStatus
     version: str
 
 
@@ -105,13 +113,19 @@ class AgentSummary(TypedDict):
     grade: Grade
 
 
+class ChainEntry(TypedDict):
+    chain: str
+    score: ChainScore
+    classification: Classification
+    identity: Identity
+    activity: Activity
+    evidence_summary: EvidenceSummary
+
+
 class ReputationResponse(TypedDict):
     subject: Subject
-    classification: Classification
     score: Score
-    identity: Identity | None
-    activity: Activity | None
-    evidence_summary: EvidenceSummary | None
+    chains: list[ChainEntry]
     data_semantics: str
     caveats: list[str]
     updated_at: str | None
@@ -131,17 +145,17 @@ class DecisionPolicy(TypedDict, total=False):
 
 class AssessResponse(TypedDict):
     subject: Subject
-    classification: Classification
     score: Score
-    identity: Identity | None
-    activity: Activity | None
-    evidence_summary: EvidenceSummary | None
-    data_semantics: str
-    caveats: list[str]
-    updated_at: str | None
+    chains: list[ChainEntry]
     decision: str | None
     decision_reasons: list[str]
     on_the_fly: bool
+    data_semantics: str
+    caveats: list[str]
+    updated_at: str | None
+    operator_score: OperatorScore | None
+    reputation: Reputation | None
+    agents: list[AgentSummary]
 
 
 class AgentRecord(TypedDict):
