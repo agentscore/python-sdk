@@ -95,20 +95,20 @@ def test_assess_policy_deny():
 def test_get_reputation_operator_score():
     client = AgentScore(api_key=API_KEY, base_url=BASE_URL)
     rep = client.get_reputation(TEST_ADDRESS)
-
-    if "operator_score" in rep and rep["operator_score"]:
-        op = rep["operator_score"]
-        assert isinstance(op["score"], int)
-        assert isinstance(op["grade"], str)
-        assert isinstance(op["agent_count"], int)
-        assert isinstance(op["chains_active"], list)
+    op = rep.get("operator_score")
+    if not op:
+        pytest.skip("no operator_score on test address")
+    assert isinstance(op["score"], int)
+    assert isinstance(op["grade"], str)
+    assert isinstance(op["agent_count"], int)
+    assert isinstance(op["chains_active"], list)
 
 
 def test_get_reputation_reputation_field():
     client = AgentScore(api_key=API_KEY, base_url=BASE_URL)
     rep = client.get_reputation(TEST_ADDRESS)
-
-    if "reputation" in rep and rep["reputation"]:
-        r = rep["reputation"]
-        assert isinstance(r["feedback_count"], int)
-        assert isinstance(r["client_count"], int)
+    r = rep.get("reputation")
+    if not r:
+        pytest.skip("no reputation on test address")
+    assert isinstance(r["feedback_count"], int)
+    assert isinstance(r["client_count"], int)
