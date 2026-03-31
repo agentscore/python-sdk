@@ -58,28 +58,24 @@ def test_constructor_default_timeout():
 # ---------------------------------------------------------------------------
 
 REPUTATION_PAYLOAD = {
-    "subject": {"chain": "base", "address": ADDRESS},
-    "classification": {
-        "entity_type": "wallet",
-        "confidence": 0.9,
-        "is_known": True,
-        "is_known_erc8004_agent": False,
-        "has_candidate_payment_activity": True,
-        "has_verified_payment_activity": False,
-        "reasons": [],
-    },
+    "subject": {"chains": ["base"], "address": ADDRESS},
     "score": {
-        "status": "scored",
         "value": 75,
         "grade": "B",
-        "confidence": 0.85,
-        "dimensions": None,
         "scored_at": "2024-01-01T00:00:00Z",
+        "status": "scored",
         "version": "1",
     },
-    "identity": None,
-    "activity": None,
-    "evidence_summary": None,
+    "chains": [
+        {
+            "chain": "base",
+            "score": {"value": 75, "grade": "B"},
+            "classification": {"entity_type": "wallet", "confidence": 0.9},
+            "identity": {},
+            "activity": {},
+            "evidence_summary": {},
+        },
+    ],
     "data_semantics": "live",
     "caveats": [],
     "updated_at": "2024-01-01T00:00:00Z",
