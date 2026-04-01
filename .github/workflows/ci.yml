@@ -19,4 +19,4 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run vulture . vulture_whitelist.py --min-confidence 80 --exclude .venv
-      - run: uv run pytest tests/
+      - run: uv run pytest tests/ --cov=agentscore --cov-report=term-missing

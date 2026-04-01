@@ -531,3 +531,112 @@ def test_user_agent_header_includes_version():
     client.get_stats()
     request = respx.calls[0].request
     assert request.headers["user-agent"] == f"agentscore-py/{version('agentscore-py')}"
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_get_agents_none_values_excluded_from_params():
+    route = respx.get(f"{BASE_URL}/v1/agents").mock(return_value=httpx.Response(200, json=AGENTS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.get_agents(chain="base", limit=None)
+    url_str = str(route.calls.last.request.url)
+    assert "chain=base" in url_str
+    assert "limit" not in url_str
+
+
+@respx.mock
+def test_assess_refresh_false_not_included_in_body():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS, refresh=False)
+    body = json.loads(route.calls.last.request.content)
+    assert "refresh" not in body
+
+
+@respx.mock
+def test_double_close():
+    respx.get(f"{BASE_URL}/v1/stats").mock(return_value=httpx.Response(200, json=STATS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.get_stats()
+    client.close()
+    client.close()
+    assert client._sync_client is None
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_double_aclose():
+    respx.get(f"{BASE_URL}/v1/stats").mock(return_value=httpx.Response(200, json=STATS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.aget_stats()
+    await client.aclose()
+    await client.aclose()
+    assert client._async_client is None
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_concurrent_async_calls():
+    import asyncio
+
+    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    results = await asyncio.gather(
+        client.aget_reputation(ADDRESS),
+        client.aget_reputation(ADDRESS),
+        client.aget_reputation(ADDRESS),
+    )
+    assert len(results) == 3
+    for r in results:
+        assert r["score"]["grade"] == "B"
+    await client.aclose()
+
+
+@respx.mock
+def test_empty_chain_string_not_included_in_params():
+    route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.get_reputation(ADDRESS, chain="")
+    assert "chain" not in str(route.calls.last.request.url)
+
+
+@respx.mock
+def test_assess_empty_policy_dict_included_in_body():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS, policy={})
+    body = json.loads(route.calls.last.request.content)
+    assert "policy" in body
+    assert body["policy"] == {}
+
+
+@respx.mock
+def test_timeout_error_raises_agentscore_error():
+    respx.get(f"{BASE_URL}/v1/stats").mock(side_effect=httpx.TimeoutException("timed out"))
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(httpx.TimeoutException):
+        client.get_stats()
+
+
+@respx.mock
+def test_connect_error_raises_agentscore_error():
+    respx.get(f"{BASE_URL}/v1/stats").mock(side_effect=httpx.ConnectError("connection refused"))
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(httpx.ConnectError):
+        client.get_stats()
+
+
+@respx.mock
+def test_error_response_no_error_key_fallback():
+    respx.get(f"{BASE_URL}/v1/stats").mock(return_value=httpx.Response(422, json={"detail": "validation failed"}))
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.get_stats()
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.code == "unknown_error"

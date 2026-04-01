@@ -33,6 +33,9 @@ dev = [
     "respx>=0.21",
 ]
 
+[tool.pytest.ini_options]
+addopts = "--cov=agentscore --cov-report=term-missing --cov-fail-under=94"
+
 [tool.hatch.build.targets.wheel]
 packages = ["agentscore"]
 
@@ -40,4 +43,5 @@ packages = ["agentscore"]
 dev = [
     "ruff>=0.11.0",
     "vulture>=2.15",
+    "pytest-cov>=6.0",
 ]
