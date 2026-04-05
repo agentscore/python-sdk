@@ -9,11 +9,9 @@ from agentscore.errors import AgentScoreError
 
 if TYPE_CHECKING:
     from agentscore.types import (
-        AgentsListResponse,
         AssessResponse,
         DecisionPolicy,
-        ReputationResponseFull,
-        StatsResponse,
+        ReputationResponse,
     )
 
 
@@ -86,7 +84,7 @@ class AgentScore:
 
     # --- Sync methods ---
 
-    def get_reputation(self, address: str, chain: str | None = None) -> ReputationResponseFull:
+    def get_reputation(self, address: str, chain: str | None = None) -> ReputationResponse:
         """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
         params: dict[str, str] = {}
         if chain:
@@ -114,22 +112,9 @@ class AgentScore:
         response = client.post("/v1/assess", json=body)
         return self._handle_response(response)
 
-    def get_agents(self, **filters: Any) -> AgentsListResponse:
-        """Browse agents (free)."""
-        params = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in filters.items() if v is not None}
-        client = self._get_sync_client()
-        response = client.get("/v1/agents", params=params)
-        return self._handle_response(response)
-
-    def get_stats(self) -> StatsResponse:
-        """Get ecosystem stats (free)."""
-        client = self._get_sync_client()
-        response = client.get("/v1/stats")
-        return self._handle_response(response)
-
     # --- Async methods ---
 
-    async def aget_reputation(self, address: str, chain: str | None = None) -> ReputationResponseFull:
+    async def aget_reputation(self, address: str, chain: str | None = None) -> ReputationResponse:
         """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
         params: dict[str, str] = {}
         if chain:
@@ -155,19 +140,6 @@ class AgentScore:
             body["policy"] = dict(policy)
         client = self._get_async_client()
         response = await client.post("/v1/assess", json=body)
-        return self._handle_response(response)
-
-    async def aget_agents(self, **filters: Any) -> AgentsListResponse:
-        """Browse agents (free)."""
-        params = {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in filters.items() if v is not None}
-        client = self._get_async_client()
-        response = await client.get("/v1/agents", params=params)
-        return self._handle_response(response)
-
-    async def aget_stats(self) -> StatsResponse:
-        """Get ecosystem stats (free)."""
-        client = self._get_async_client()
-        response = await client.get("/v1/stats")
         return self._handle_response(response)
 
     def close(self):

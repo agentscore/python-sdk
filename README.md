@@ -28,14 +28,6 @@ base_rep = client.get_reputation("0x1234...", chain="base")
 # On-the-fly assessment with policy (paid)
 result = client.assess("0x1234...", policy={"min_grade": "B", "min_score": 35})
 print(result["decision"], result["decision_reasons"])
-
-# Browse agents
-agents = client.get_agents(chain="base", limit=10)
-print(len(agents["items"]), agents["count"])
-
-# Ecosystem stats
-stats = client.get_stats()
-print(stats["erc8004"]["known_agents"])
 ```
 
 ### Async
