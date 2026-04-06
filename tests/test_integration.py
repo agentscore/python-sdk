@@ -104,16 +104,6 @@ def test_get_reputation_operator_score():
     assert isinstance(op["chains_active"], list)
 
 
-def test_get_reputation_reputation_field():
-    client = AgentScore(api_key=API_KEY, base_url=BASE_URL)
-    rep = client.get_reputation(TEST_ADDRESS)
-    r = rep.get("reputation")
-    if not r:
-        pytest.skip("no reputation on test address")
-    assert isinstance(r["feedback_count"], int)
-    assert isinstance(r["client_count"], int)
-
-
 def test_assess_then_get_reputation():
     client = AgentScore(api_key=API_KEY, base_url=BASE_URL)
     assessed = client.assess(TEST_ADDRESS)

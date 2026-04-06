@@ -35,7 +35,7 @@ class AgentScore:
     def _headers(self) -> dict:
         return {
             "Accept": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
+            "X-API-Key": self.api_key,
             "User-Agent": f"agentscore-py/{_pkg_version('agentscore-py')}",
         }
 

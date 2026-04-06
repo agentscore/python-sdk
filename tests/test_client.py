@@ -220,7 +220,7 @@ def test_assess_raises_on_402():
 
 
 # ---------------------------------------------------------------------------
-# Authorization header
+# API key header
 # ---------------------------------------------------------------------------
 
 REPUTATION_PAYLOAD_SIMPLE = {
@@ -239,7 +239,7 @@ def test_auth_header_is_sent():
     )
     client = AgentScore(api_key="my-secret-key")
     client.get_reputation(ADDRESS)
-    assert route.calls.last.request.headers["authorization"] == "Bearer my-secret-key"
+    assert route.calls.last.request.headers["x-api-key"] == "my-secret-key"
 
 
 # ---------------------------------------------------------------------------
@@ -485,3 +485,182 @@ def test_error_response_no_error_key_fallback():
         client.get_reputation(ADDRESS)
     assert exc_info.value.status_code == 422
     assert exc_info.value.code == "unknown_error"
+
+
+# ---------------------------------------------------------------------------
+# Verification / Compliance fields
+# ---------------------------------------------------------------------------
+
+
+REPUTATION_WITH_VERIFICATION = {
+    **REPUTATION_PAYLOAD,
+    "verification_level": "kyc_verified",
+}
+
+ASSESS_WITH_COMPLIANCE = {
+    **ASSESS_PAYLOAD,
+    "decision": "deny",
+    "decision_reasons": ["kyc_required", "sanctions_check_pending"],
+    "operator_verification": {
+        "level": "none",
+        "operator_type": None,
+        "claimed_at": None,
+        "verified_at": None,
+    },
+    "verify_url": "https://agentscore.sh/verify/abc123",
+    "resolved_operator": "0xoperator456",
+}
+
+
+@respx.mock
+def test_get_reputation_returns_verification_level():
+    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+        return_value=httpx.Response(200, json=REPUTATION_WITH_VERIFICATION)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.get_reputation(ADDRESS)
+    assert result["verification_level"] == "kyc_verified"
+
+
+@respx.mock
+def test_get_reputation_omits_verification_level_when_absent():
+    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.get_reputation(ADDRESS)
+    assert "verification_level" not in result
+
+
+@respx.mock
+def test_assess_returns_operator_verification():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(ADDRESS)
+    assert result["operator_verification"]["level"] == "none"
+    assert result["operator_verification"]["operator_type"] is None
+
+
+@respx.mock
+def test_assess_returns_verify_url():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(ADDRESS)
+    assert result["verify_url"] == "https://agentscore.sh/verify/abc123"
+
+
+@respx.mock
+def test_assess_returns_resolved_operator():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(ADDRESS)
+    assert result["resolved_operator"] == "0xoperator456"
+
+
+@respx.mock
+def test_assess_omits_verification_fields_when_absent():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(ADDRESS)
+    assert "operator_verification" not in result
+    assert "verify_url" not in result
+    assert "resolved_operator" not in result
+
+
+@respx.mock
+def test_assess_sends_compliance_policy_fields():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    policy = {
+        "require_kyc": True,
+        "require_sanctions_clear": True,
+        "min_age": 90,
+        "blocked_jurisdictions": ["KP", "IR"],
+        "require_entity_type": "agent",
+    }
+    client.assess(ADDRESS, policy=policy)
+    body = json.loads(route.calls.last.request.content)
+    assert body["policy"]["require_kyc"] is True
+    assert body["policy"]["require_sanctions_clear"] is True
+    assert body["policy"]["min_age"] == 90
+    assert body["policy"]["blocked_jurisdictions"] == ["KP", "IR"]
+    assert body["policy"]["require_entity_type"] == "agent"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aget_reputation_returns_verification_level():
+    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+        return_value=httpx.Response(200, json=REPUTATION_WITH_VERIFICATION)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.aget_reputation(ADDRESS)
+    assert result["verification_level"] == "kyc_verified"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_returns_compliance_fields():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.aassess(ADDRESS)
+    assert result["operator_verification"]["level"] == "none"
+    assert result["verify_url"] == "https://agentscore.sh/verify/abc123"
+    assert result["resolved_operator"] == "0xoperator456"
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Integration-style: compliance deny flow
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_full_compliance_deny_flow():
+    """Full assess flow with compliance policy returning deny + verify_url."""
+    compliance_response = {
+        **REPUTATION_PAYLOAD,
+        "decision": "deny",
+        "decision_reasons": ["kyc_required", "sanctions_check_pending"],
+        "on_the_fly": False,
+        "operator_verification": {
+            "level": "none",
+            "operator_type": None,
+            "claimed_at": None,
+            "verified_at": None,
+        },
+        "verify_url": "https://agentscore.sh/verify/xyz789",
+    }
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=compliance_response)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(
+        ADDRESS,
+        policy={
+            "require_kyc": True,
+            "require_sanctions_clear": True,
+        },
+    )
+    assert result["decision"] == "deny"
+    assert "kyc_required" in result["decision_reasons"]
+    assert "sanctions_check_pending" in result["decision_reasons"]
+    assert result["verify_url"] == "https://agentscore.sh/verify/xyz789"
+    assert result["operator_verification"]["level"] == "none"
+
+    body = json.loads(route.calls.last.request.content)
+    assert body["policy"]["require_kyc"] is True
+    assert body["policy"]["require_sanctions_clear"] is True

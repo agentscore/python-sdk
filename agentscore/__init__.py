@@ -7,9 +7,11 @@ from agentscore.types import (
     DecisionPolicy,
     EntityType,
     Grade,
+    OperatorVerification,
     Reputation,
     ReputationResponse,
     ReputationStatus,
+    VerificationLevel,
 )
 
 __version__ = _pkg_version("agentscore-py")
@@ -21,8 +23,10 @@ __all__ = [
     "DecisionPolicy",
     "EntityType",
     "Grade",
+    "OperatorVerification",
     "Reputation",
     "ReputationResponse",
     "ReputationStatus",
+    "VerificationLevel",
     "__version__",
 ]

@@ -5,6 +5,7 @@ from typing import Literal, TypedDict
 Grade = Literal["A", "B", "C", "D", "F"]
 EntityType = Literal["agent", "service", "hybrid", "wallet", "bot", "unknown"]
 ReputationStatus = Literal["scored", "stale", "known_unscored"]
+VerificationLevel = Literal["none", "wallet_claimed", "kyc_verified"]
 
 
 class Subject(TypedDict):
@@ -132,12 +133,28 @@ class ReputationResponse(_ReputationResponseRequired, total=False):
     reputation: Reputation
     operator_score: OperatorScore
     agents: list[AgentSummary]
+    verification_level: VerificationLevel
+
+
+class _OperatorVerificationRequired(TypedDict):
+    level: VerificationLevel
+
+
+class OperatorVerification(_OperatorVerificationRequired, total=False):
+    operator_type: str | None
+    claimed_at: str | None
+    verified_at: str | None
 
 
 class DecisionPolicy(TypedDict, total=False):
     min_grade: Grade
     min_score: int
     require_verified_payment_activity: bool
+    require_kyc: bool
+    require_sanctions_clear: bool
+    min_age: int
+    blocked_jurisdictions: list[str]
+    require_entity_type: str
 
 
 class _AssessResponseRequired(TypedDict):
@@ -156,3 +173,6 @@ class AssessResponse(_AssessResponseRequired, total=False):
     operator_score: OperatorScore | None
     reputation: Reputation | None
     agents: list[AgentSummary]
+    operator_verification: OperatorVerification
+    resolved_operator: str
+    verify_url: str
