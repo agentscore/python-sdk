@@ -524,9 +524,7 @@ def test_get_reputation_returns_verification_level():
 
 @respx.mock
 def test_get_reputation_omits_verification_level_when_absent():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
-    )
+    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
     result = client.get_reputation(ADDRESS)
     assert "verification_level" not in result
@@ -534,9 +532,7 @@ def test_get_reputation_omits_verification_level_when_absent():
 
 @respx.mock
 def test_assess_returns_operator_verification():
-    respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
-    )
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE))
     client = AgentScore(api_key=API_KEY)
     result = client.assess(ADDRESS)
     assert result["operator_verification"]["level"] == "none"
@@ -545,9 +541,7 @@ def test_assess_returns_operator_verification():
 
 @respx.mock
 def test_assess_returns_verify_url():
-    respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
-    )
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE))
     client = AgentScore(api_key=API_KEY)
     result = client.assess(ADDRESS)
     assert result["verify_url"] == "https://agentscore.sh/verify/abc123"
@@ -555,9 +549,7 @@ def test_assess_returns_verify_url():
 
 @respx.mock
 def test_assess_returns_resolved_operator():
-    respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
-    )
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE))
     client = AgentScore(api_key=API_KEY)
     result = client.assess(ADDRESS)
     assert result["resolved_operator"] == "0xoperator456"
@@ -565,9 +557,7 @@ def test_assess_returns_resolved_operator():
 
 @respx.mock
 def test_assess_omits_verification_fields_when_absent():
-    respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(200, json=ASSESS_PAYLOAD)
-    )
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
     result = client.assess(ADDRESS)
     assert "operator_verification" not in result
@@ -577,9 +567,7 @@ def test_assess_omits_verification_fields_when_absent():
 
 @respx.mock
 def test_assess_sends_compliance_policy_fields():
-    route = respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(200, json=ASSESS_PAYLOAD)
-    )
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
     policy = {
         "require_kyc": True,
@@ -612,9 +600,7 @@ async def test_aget_reputation_returns_verification_level():
 @pytest.mark.asyncio
 @respx.mock
 async def test_aassess_returns_compliance_fields():
-    respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE)
-    )
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE))
     client = AgentScore(api_key=API_KEY)
     result = await client.aassess(ADDRESS)
     assert result["operator_verification"]["level"] == "none"
@@ -644,9 +630,7 @@ def test_full_compliance_deny_flow():
         },
         "verify_url": "https://agentscore.sh/verify/xyz789",
     }
-    route = respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(200, json=compliance_response)
-    )
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=compliance_response))
     client = AgentScore(api_key=API_KEY)
     result = client.assess(
         ADDRESS,
