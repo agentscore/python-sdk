@@ -29,13 +29,20 @@ base_rep = client.get_reputation("0x1234...", chain="base")
 result = client.assess("0x1234...", policy={"min_grade": "B", "min_score": 35})
 print(result["decision"], result["decision_reasons"])
 
-# Browse agents
-agents = client.get_agents(chain="base", limit=10)
-print(len(agents["items"]), agents["count"])
+# Compliance assessment with verification policy
+gated = client.assess("0x1234...", policy={
+    "require_kyc": True,
+    "require_sanctions_clear": True,
+    "min_age": 21,
+})
 
-# Ecosystem stats
-stats = client.get_stats()
-print(stats["erc8004"]["known_agents"])
+if gated["decision"] == "deny":
+    print(gated["decision_reasons"])  # ["kyc_required"]
+    print(gated.get("verify_url"))    # URL for operator verification
+
+# Check verification level
+rep = client.get_reputation("0x1234...")
+print(rep.get("verification_level"))  # "none" | "wallet_claimed" | "kyc_verified"
 ```
 
 ### Async
