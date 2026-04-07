@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 
 Grade = Literal["A", "B", "C", "D", "F"]
-EntityType = Literal["agent", "service", "hybrid", "wallet", "bot", "unknown"]
+EntityType = Literal["agent", "service", "hybrid", "wallet", "bot", "unknown", "individual", "entity"]
 ReputationStatus = Literal["scored", "stale", "known_unscored"]
 VerificationLevel = Literal["none", "wallet_claimed", "kyc_verified"]
 
@@ -146,6 +146,18 @@ class OperatorVerification(_OperatorVerificationRequired, total=False):
     verified_at: str | None
 
 
+class PolicyCheck(TypedDict, total=False):
+    rule: str
+    passed: bool
+    required: object
+    actual: object
+
+
+class PolicyResult(TypedDict):
+    all_passed: bool
+    checks: list[PolicyCheck]
+
+
 class DecisionPolicy(TypedDict, total=False):
     min_grade: Grade
     min_score: int
@@ -176,3 +188,4 @@ class AssessResponse(_AssessResponseRequired, total=False):
     operator_verification: OperatorVerification
     resolved_operator: str
     verify_url: str
+    policy_result: PolicyResult | None
