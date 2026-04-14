@@ -2,6 +2,18 @@
 
 Python client for the AgentScore trust and reputation API.
 
+## Identity Model
+
+## Methods (sync + async)
+
+- `get_reputation` / `aget_reputation` — cached reputation lookup (free)
+- `assess` / `aassess` — identity gate with policy (paid). Accepts `operator_token` for non-wallet agents.
+- `create_session` / `acreate_session` — create verification session
+- `poll_session` / `apoll_session` — poll session status, returns credential when verified
+- `create_credential` / `acreate_credential` — create operator credential (24h TTL default)
+- `list_credentials` / `alist_credentials` — list active credentials
+- `revoke_credential` / `arevoke_credential` — revoke a credential
+
 ## Architecture
 
 Single-package Python library published to PyPI.

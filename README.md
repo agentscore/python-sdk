@@ -25,11 +25,7 @@ print(rep["score"]["value"], rep["score"]["grade"])
 # Filter to a specific chain
 base_rep = client.get_reputation("0x1234...", chain="base")
 
-# On-the-fly assessment with policy (paid)
-result = client.assess("0x1234...", policy={"min_grade": "B", "min_score": 35})
-print(result["decision"], result["decision_reasons"])
-
-# Compliance assessment with verification policy
+# Identity gate with policy (paid)
 gated = client.assess("0x1234...", policy={
     "require_kyc": True,
     "require_sanctions_clear": True,
@@ -45,12 +41,53 @@ rep = client.get_reputation("0x1234...")
 print(rep.get("verification_level"))  # "none" | "wallet_claimed" | "kyc_verified"
 ```
 
+### Credential-Based Identity
+
+Agents without wallets can use operator credentials for identity:
+
+```python
+result = client.assess(operator_token="opc_...")
+print(result["decision"])  # "allow" | "deny"
+```
+
+### Verification Sessions
+
+Bootstrap identity for first-time agents:
+
+```python
+session = client.create_session()
+print(session["verify_url"], session["poll_secret"])
+
+status = client.poll_session(session["session_id"], session["poll_secret"])
+if status["status"] == "verified":
+    print(status["operator_token"])  # "opc_..." — use for future requests
+```
+
+### Credential Management
+
+```python
+cred = client.create_credential(label="my-agent", ttl_days=7)
+print(cred["credential"])  # shown once
+
+credentials = client.list_credentials()
+client.revoke_credential(cred["id"])
+```
+
 ### Async
+
+All methods have async variants prefixed with `a`:
 
 ```python
 async with AgentScore(api_key="as_live_...") as client:
     rep = await client.aget_reputation("0x1234...")
-    result = await client.aassess("0x1234...", policy={"min_grade": "B"})
+    result = await client.aassess("0x1234...", policy={"require_kyc": True})
+
+    # Identity model methods
+    session = await client.acreate_session()
+    status = await client.apoll_session(session["session_id"], session["poll_secret"])
+    cred = await client.acreate_credential(label="my-agent")
+    await client.alist_credentials()
+    await client.arevoke_credential(cred["id"])
 ```
 
 ### Context Manager

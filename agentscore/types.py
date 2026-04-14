@@ -159,13 +159,11 @@ class PolicyResult(TypedDict):
 
 
 class DecisionPolicy(TypedDict, total=False):
-    min_grade: Grade
-    min_score: int
-    require_verified_payment_activity: bool
     require_kyc: bool
     require_sanctions_clear: bool
     min_age: int
     blocked_jurisdictions: list[str]
+    allowed_jurisdictions: list[str]
     require_entity_type: str
 
 
@@ -189,3 +187,41 @@ class AssessResponse(_AssessResponseRequired, total=False):
     resolved_operator: str
     verify_url: str
     policy_result: PolicyResult | None
+
+
+class SessionCreateResponse(TypedDict):
+    session_id: str
+    poll_secret: str
+    poll_url: str
+
+
+class _SessionPollResponseRequired(TypedDict):
+    session_id: str
+    status: str
+
+
+class SessionPollResponse(_SessionPollResponseRequired, total=False):
+    operator_token: str
+    completed_at: str
+
+
+class CredentialItem(TypedDict):
+    id: str
+    label: str | None
+    prefix: str
+    created_at: str
+    expires_at: str | None
+    last_used_at: str | None
+
+
+class CredentialCreateResponse(TypedDict):
+    id: str
+    label: str | None
+    credential: str
+    prefix: str
+    created_at: str
+    expires_at: str | None
+
+
+class CredentialListResponse(TypedDict):
+    credentials: list[CredentialItem]

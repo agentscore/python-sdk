@@ -10,8 +10,12 @@ from agentscore.errors import AgentScoreError
 if TYPE_CHECKING:
     from agentscore.types import (
         AssessResponse,
+        CredentialCreateResponse,
+        CredentialListResponse,
         DecisionPolicy,
         ReputationResponse,
+        SessionCreateResponse,
+        SessionPollResponse,
     )
 
 
@@ -58,6 +62,13 @@ class AgentScore:
         return self._async_client
 
     def _handle_response(self, response: httpx.Response) -> dict:
+        if response.status_code == 429:
+            retry_after = response.headers.get("retry-after", "1")
+            raise AgentScoreError(
+                code="rate_limited",
+                message=f"Rate limit exceeded. Retry after {retry_after}s",
+                status_code=429,
+            )
         if response.status_code >= 400:
             try:
                 body = response.json()
@@ -95,13 +106,18 @@ class AgentScore:
 
     def assess(
         self,
-        address: str,
+        address: str | None = None,
         chain: str | None = None,
         refresh: bool = False,
         policy: DecisionPolicy | None = None,
+        operator_token: str | None = None,
     ) -> AssessResponse:
-        """Assess a wallet (paid, writes score on-the-fly)."""
-        body: dict[str, Any] = {"address": address}
+        """Assess a wallet or operator (paid, writes score on-the-fly)."""
+        body: dict[str, Any] = {}
+        if address:
+            body["address"] = address
+        if operator_token:
+            body["operator_token"] = operator_token
         if chain:
             body["chain"] = chain
         if refresh:
@@ -110,6 +126,57 @@ class AgentScore:
             body["policy"] = dict(policy)
         client = self._get_sync_client()
         response = client.post("/v1/assess", json=body)
+        return self._handle_response(response)
+
+    def create_session(
+        self,
+        context: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> SessionCreateResponse:
+        """Create an assessment session for deferred scoring."""
+        body: dict[str, Any] = {}
+        if context is not None:
+            body["context"] = context
+        if metadata is not None:
+            body["metadata"] = metadata
+        client = self._get_sync_client()
+        response = client.post("/v1/sessions", json=body)
+        return self._handle_response(response)
+
+    def poll_session(self, session_id: str, poll_secret: str) -> SessionPollResponse:
+        """Poll a session for its current status and result."""
+        client = self._get_sync_client()
+        response = client.get(
+            f"/v1/sessions/{session_id}",
+            headers={"X-Poll-Secret": poll_secret},
+        )
+        return self._handle_response(response)
+
+    def create_credential(
+        self,
+        label: str | None = None,
+        ttl_days: int | None = None,
+    ) -> CredentialCreateResponse:
+        """Create a new API credential."""
+        body: dict[str, Any] = {}
+        if label is not None:
+            body["label"] = label
+        if ttl_days is not None:
+            body["ttl_days"] = ttl_days
+        client = self._get_sync_client()
+        response = client.post("/v1/credentials", json=body)
+        return self._handle_response(response)
+
+    def list_credentials(self) -> CredentialListResponse:
+        """List all API credentials."""
+        client = self._get_sync_client()
+        response = client.get("/v1/credentials")
+        return self._handle_response(response)
+
+    def revoke_credential(self, id: str) -> dict:
+        """Revoke an API credential by ID."""
+        client = self._get_sync_client()
+        response = client.delete(f"/v1/credentials/{id}")
         return self._handle_response(response)
 
     # --- Async methods ---
@@ -125,13 +192,18 @@ class AgentScore:
 
     async def aassess(
         self,
-        address: str,
+        address: str | None = None,
         chain: str | None = None,
         refresh: bool = False,
         policy: DecisionPolicy | None = None,
+        operator_token: str | None = None,
     ) -> AssessResponse:
-        """Assess a wallet (paid, writes score on-the-fly)."""
-        body: dict[str, Any] = {"address": address}
+        """Assess a wallet or operator (paid, writes score on-the-fly)."""
+        body: dict[str, Any] = {}
+        if address:
+            body["address"] = address
+        if operator_token:
+            body["operator_token"] = operator_token
         if chain:
             body["chain"] = chain
         if refresh:
@@ -140,6 +212,57 @@ class AgentScore:
             body["policy"] = dict(policy)
         client = self._get_async_client()
         response = await client.post("/v1/assess", json=body)
+        return self._handle_response(response)
+
+    async def acreate_session(
+        self,
+        context: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> SessionCreateResponse:
+        """Create an assessment session for deferred scoring."""
+        body: dict[str, Any] = {}
+        if context is not None:
+            body["context"] = context
+        if metadata is not None:
+            body["metadata"] = metadata
+        client = self._get_async_client()
+        response = await client.post("/v1/sessions", json=body)
+        return self._handle_response(response)
+
+    async def apoll_session(self, session_id: str, poll_secret: str) -> SessionPollResponse:
+        """Poll a session for its current status and result."""
+        client = self._get_async_client()
+        response = await client.get(
+            f"/v1/sessions/{session_id}",
+            headers={"X-Poll-Secret": poll_secret},
+        )
+        return self._handle_response(response)
+
+    async def acreate_credential(
+        self,
+        label: str | None = None,
+        ttl_days: int | None = None,
+    ) -> CredentialCreateResponse:
+        """Create a new API credential."""
+        body: dict[str, Any] = {}
+        if label is not None:
+            body["label"] = label
+        if ttl_days is not None:
+            body["ttl_days"] = ttl_days
+        client = self._get_async_client()
+        response = await client.post("/v1/credentials", json=body)
+        return self._handle_response(response)
+
+    async def alist_credentials(self) -> CredentialListResponse:
+        """List all API credentials."""
+        client = self._get_async_client()
+        response = await client.get("/v1/credentials")
+        return self._handle_response(response)
+
+    async def arevoke_credential(self, id: str) -> dict:
+        """Revoke an API credential by ID."""
+        client = self._get_async_client()
+        response = await client.delete(f"/v1/credentials/{id}")
         return self._handle_response(response)
 
     def close(self):
