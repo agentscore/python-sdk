@@ -754,13 +754,20 @@ def test_create_session_success():
 
 
 @respx.mock
-def test_create_session_with_context_and_metadata():
+def test_create_session_with_first_class_fields():
     route = respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
-    client.create_session(context={"address": ADDRESS}, metadata={"source": "test"})
+    client.create_session(
+        context="wine purchase verification",
+        return_url="https://example.com/callback",
+        payment_methods=["tempo", "stripe"],
+        product_name="Cabernet Reserve 2022",
+    )
     body = json.loads(route.calls.last.request.content)
-    assert body["context"] == {"address": ADDRESS}
-    assert body["metadata"] == {"source": "test"}
+    assert body["context"] == "wine purchase verification"
+    assert body["return_url"] == "https://example.com/callback"
+    assert body["payment_methods"] == ["tempo", "stripe"]
+    assert body["product_name"] == "Cabernet Reserve 2022"
 
 
 @respx.mock
@@ -770,7 +777,9 @@ def test_create_session_omits_none_fields():
     client.create_session()
     body = json.loads(route.calls.last.request.content)
     assert "context" not in body
-    assert "metadata" not in body
+    assert "return_url" not in body
+    assert "payment_methods" not in body
+    assert "product_name" not in body
 
 
 @respx.mock
@@ -1018,13 +1027,20 @@ async def test_acreate_session_success():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_acreate_session_with_context_and_metadata():
+async def test_acreate_session_with_first_class_fields():
     route = respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
-    await client.acreate_session(context={"address": ADDRESS}, metadata={"source": "test"})
+    await client.acreate_session(
+        context="wine purchase verification",
+        return_url="https://example.com/callback",
+        payment_methods=["tempo", "stripe"],
+        product_name="Cabernet Reserve 2022",
+    )
     body = json.loads(route.calls.last.request.content)
-    assert body["context"] == {"address": ADDRESS}
-    assert body["metadata"] == {"source": "test"}
+    assert body["context"] == "wine purchase verification"
+    assert body["return_url"] == "https://example.com/callback"
+    assert body["payment_methods"] == ["tempo", "stripe"]
+    assert body["product_name"] == "Cabernet Reserve 2022"
     await client.aclose()
 
 

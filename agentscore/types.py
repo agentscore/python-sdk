@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
+PaymentMethod = Literal["tempo", "stripe"]
 Grade = Literal["A", "B", "C", "D", "F"]
 EntityType = Literal["agent", "service", "hybrid", "wallet", "bot", "unknown", "individual", "entity"]
 ReputationStatus = Literal["scored", "stale", "known_unscored"]
@@ -183,6 +184,13 @@ class AssessResponse(_AssessResponseRequired, total=False):
     resolved_operator: str | None
     verify_url: str
     policy_result: PolicyResult | None
+
+
+class SessionCreateRequest(TypedDict, total=False):
+    context: str
+    return_url: str
+    payment_methods: list[PaymentMethod]
+    product_name: str
 
 
 class SessionCreateResponse(TypedDict):
