@@ -8,9 +8,13 @@ ReputationStatus = Literal["scored", "stale", "known_unscored"]
 VerificationLevel = Literal["none", "wallet_claimed", "kyc_verified"]
 
 
-class Subject(TypedDict):
+class _SubjectRequired(TypedDict):
     chains: list[str]
+
+
+class Subject(_SubjectRequired, total=False):
     address: str
+    credential_prefix: str
 
 
 class Classification(TypedDict):
@@ -142,7 +146,6 @@ class _OperatorVerificationRequired(TypedDict):
 
 class OperatorVerification(_OperatorVerificationRequired, total=False):
     operator_type: str | None
-    claimed_at: str | None
     verified_at: str | None
 
 
@@ -168,23 +171,16 @@ class DecisionPolicy(TypedDict, total=False):
 
 
 class _AssessResponseRequired(TypedDict):
-    subject: Subject
-    score: Score
-    chains: list[ChainEntry]
     decision: str | None
     decision_reasons: list[str]
+    identity_method: str
     on_the_fly: bool
-    data_semantics: str
-    caveats: list[str]
     updated_at: str | None
 
 
 class AssessResponse(_AssessResponseRequired, total=False):
-    operator_score: OperatorScore | None
-    reputation: Reputation | None
-    agents: list[AgentSummary]
     operator_verification: OperatorVerification
-    resolved_operator: str
+    resolved_operator: str | None
     verify_url: str
     policy_result: PolicyResult | None
 
@@ -192,7 +188,9 @@ class AssessResponse(_AssessResponseRequired, total=False):
 class SessionCreateResponse(TypedDict):
     session_id: str
     poll_secret: str
+    verify_url: str
     poll_url: str
+    expires_at: str
 
 
 class _SessionPollResponseRequired(TypedDict):
