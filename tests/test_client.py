@@ -759,14 +759,10 @@ def test_create_session_with_first_class_fields():
     client = AgentScore(api_key=API_KEY)
     client.create_session(
         context="wine purchase verification",
-        return_url="https://example.com/callback",
-        payment_methods=["tempo", "stripe"],
         product_name="Cabernet Reserve 2022",
     )
     body = json.loads(route.calls.last.request.content)
     assert body["context"] == "wine purchase verification"
-    assert body["return_url"] == "https://example.com/callback"
-    assert body["payment_methods"] == ["tempo", "stripe"]
     assert body["product_name"] == "Cabernet Reserve 2022"
 
 
@@ -777,8 +773,6 @@ def test_create_session_omits_none_fields():
     client.create_session()
     body = json.loads(route.calls.last.request.content)
     assert "context" not in body
-    assert "return_url" not in body
-    assert "payment_methods" not in body
     assert "product_name" not in body
 
 
@@ -1032,14 +1026,10 @@ async def test_acreate_session_with_first_class_fields():
     client = AgentScore(api_key=API_KEY)
     await client.acreate_session(
         context="wine purchase verification",
-        return_url="https://example.com/callback",
-        payment_methods=["tempo", "stripe"],
         product_name="Cabernet Reserve 2022",
     )
     body = json.loads(route.calls.last.request.content)
     assert body["context"] == "wine purchase verification"
-    assert body["return_url"] == "https://example.com/callback"
-    assert body["payment_methods"] == ["tempo", "stripe"]
     assert body["product_name"] == "Cabernet Reserve 2022"
     await client.aclose()
 

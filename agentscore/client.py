@@ -13,7 +13,6 @@ if TYPE_CHECKING:
         CredentialCreateResponse,
         CredentialListResponse,
         DecisionPolicy,
-        PaymentMethod,
         ReputationResponse,
         SessionCreateResponse,
         SessionPollResponse,
@@ -132,18 +131,12 @@ class AgentScore:
     def create_session(
         self,
         context: str | None = None,
-        return_url: str | None = None,
-        payment_methods: list[PaymentMethod] | None = None,
         product_name: str | None = None,
     ) -> SessionCreateResponse:
         """Create an assessment session for deferred scoring."""
         body: dict[str, Any] = {}
         if context is not None:
             body["context"] = context
-        if return_url is not None:
-            body["return_url"] = return_url
-        if payment_methods is not None:
-            body["payment_methods"] = payment_methods
         if product_name is not None:
             body["product_name"] = product_name
         client = self._get_sync_client()
@@ -224,18 +217,12 @@ class AgentScore:
     async def acreate_session(
         self,
         context: str | None = None,
-        return_url: str | None = None,
-        payment_methods: list[PaymentMethod] | None = None,
         product_name: str | None = None,
     ) -> SessionCreateResponse:
         """Create an assessment session for deferred scoring."""
         body: dict[str, Any] = {}
         if context is not None:
             body["context"] = context
-        if return_url is not None:
-            body["return_url"] = return_url
-        if payment_methods is not None:
-            body["payment_methods"] = payment_methods
         if product_name is not None:
             body["product_name"] = product_name
         client = self._get_async_client()
