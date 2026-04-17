@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 Grade = Literal["A", "B", "C", "D", "F"]
 EntityType = Literal["agent", "service", "hybrid", "wallet", "bot", "unknown", "individual", "entity"]
@@ -183,6 +183,7 @@ class AssessResponse(_AssessResponseRequired, total=False):
     resolved_operator: str | None
     verify_url: str
     policy_result: PolicyResult | None
+    explanation: NotRequired[list[dict]]
 
 
 class SessionCreateRequest(TypedDict, total=False):
@@ -206,6 +207,9 @@ class _SessionPollResponseRequired(TypedDict):
 class SessionPollResponse(_SessionPollResponseRequired, total=False):
     operator_token: str
     completed_at: str
+    next_steps: NotRequired[dict]
+    retry_after_seconds: NotRequired[int]
+    token_ttl_seconds: NotRequired[int]
 
 
 class CredentialItem(TypedDict):
@@ -228,3 +232,4 @@ class CredentialCreateResponse(TypedDict):
 
 class CredentialListResponse(TypedDict):
     credentials: list[CredentialItem]
+    account_verification: NotRequired[dict]
