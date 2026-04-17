@@ -178,12 +178,21 @@ class _AssessResponseRequired(TypedDict):
     updated_at: str | None
 
 
+class PolicyExplanation(TypedDict, total=False):
+    rule: str
+    passed: bool
+    required: object
+    actual: object
+    message: str
+    how_to_remedy: str | None
+
+
 class AssessResponse(_AssessResponseRequired, total=False):
     operator_verification: OperatorVerification
     resolved_operator: str | None
     verify_url: str
     policy_result: PolicyResult | None
-    explanation: NotRequired[list[dict]]
+    explanation: NotRequired[list[PolicyExplanation]]
 
 
 class SessionCreateRequest(TypedDict, total=False):
