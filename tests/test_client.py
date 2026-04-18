@@ -268,7 +268,7 @@ def test_error_missing_error_key_falls_back():
 def test_assess_forwards_policy_in_body():
     route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
-    policy = {"min_grade": "B", "min_score": 50, "require_verified_payment_activity": True}
+    policy = {"require_kyc": True, "min_age": 21}
     client.assess(ADDRESS, policy=policy)
     body = json.loads(route.calls.last.request.content)
     assert body["policy"] == policy
@@ -648,3 +648,480 @@ def test_full_compliance_deny_flow():
     body = json.loads(route.calls.last.request.content)
     assert body["policy"]["require_kyc"] is True
     assert body["policy"]["require_sanctions_clear"] is True
+
+
+# ---------------------------------------------------------------------------
+# Identity model: operator_token in assess/aassess
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_assess_sends_operator_token():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(operator_token="opc_test_123")
+    body = json.loads(route.calls.last.request.content)
+    assert body["operator_token"] == "opc_test_123"
+    assert "address" not in body
+
+
+@respx.mock
+def test_assess_sends_both_address_and_operator_token():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS, operator_token="opc_both_456")
+    body = json.loads(route.calls.last.request.content)
+    assert body["address"] == ADDRESS
+    assert body["operator_token"] == "opc_both_456"
+
+
+@respx.mock
+def test_assess_address_only_backwards_compat():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS)
+    body = json.loads(route.calls.last.request.content)
+    assert body["address"] == ADDRESS
+    assert "operator_token" not in body
+
+
+@respx.mock
+def test_assess_operator_token_with_policy():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(operator_token="opc_policy", policy={"require_kyc": True})
+    body = json.loads(route.calls.last.request.content)
+    assert body["operator_token"] == "opc_policy"
+    assert "address" not in body
+    assert body["policy"]["require_kyc"] is True
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_sends_operator_token():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.aassess(operator_token="opc_async_test")
+    body = json.loads(route.calls.last.request.content)
+    assert body["operator_token"] == "opc_async_test"
+    assert "address" not in body
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_sends_both_address_and_operator_token():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.aassess(ADDRESS, operator_token="opc_async_both")
+    body = json.loads(route.calls.last.request.content)
+    assert body["address"] == ADDRESS
+    assert body["operator_token"] == "opc_async_both"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_address_only_backwards_compat():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.aassess(ADDRESS)
+    body = json.loads(route.calls.last.request.content)
+    assert body["address"] == ADDRESS
+    assert "operator_token" not in body
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# create_session
+# ---------------------------------------------------------------------------
+
+SESSION_CREATE_PAYLOAD = {
+    "session_id": "ses_abc123",
+    "poll_secret": "ps_secret456",
+    "poll_url": "https://api.agentscore.sh/v1/sessions/ses_abc123",
+}
+
+
+@respx.mock
+def test_create_session_success():
+    respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = client.create_session()
+    assert result["session_id"] == "ses_abc123"
+    assert result["poll_secret"] == "ps_secret456"
+    assert result["poll_url"] == "https://api.agentscore.sh/v1/sessions/ses_abc123"
+
+
+@respx.mock
+def test_create_session_with_first_class_fields():
+    route = respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.create_session(
+        context="wine purchase verification",
+        product_name="Cabernet Reserve 2022",
+    )
+    body = json.loads(route.calls.last.request.content)
+    assert body["context"] == "wine purchase verification"
+    assert body["product_name"] == "Cabernet Reserve 2022"
+
+
+@respx.mock
+def test_create_session_omits_none_fields():
+    route = respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.create_session()
+    body = json.loads(route.calls.last.request.content)
+    assert "context" not in body
+    assert "product_name" not in body
+
+
+@respx.mock
+def test_create_session_raises_on_error():
+    respx.post(f"{BASE_URL}/v1/sessions").mock(
+        return_value=httpx.Response(400, json={"error": {"code": "bad_request", "message": "Invalid body"}})
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.create_session()
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.code == "bad_request"
+
+
+# ---------------------------------------------------------------------------
+# poll_session
+# ---------------------------------------------------------------------------
+
+SESSION_POLL_PENDING_PAYLOAD = {
+    "session_id": "ses_abc123",
+    "status": "pending",
+}
+
+SESSION_POLL_COMPLETE_PAYLOAD = {
+    "session_id": "ses_abc123",
+    "status": "complete",
+    "score": {
+        "value": 80,
+        "grade": "B",
+        "scored_at": "2024-01-01T00:00:00Z",
+        "status": "scored",
+        "version": "1",
+    },
+    "decision": "allow",
+    "decision_reasons": [],
+    "subject": {"chains": ["base"], "address": ADDRESS},
+}
+
+
+@respx.mock
+def test_poll_session_pending():
+    respx.get(f"{BASE_URL}/v1/sessions/ses_abc123").mock(
+        return_value=httpx.Response(200, json=SESSION_POLL_PENDING_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.poll_session("ses_abc123", "ps_secret456")
+    assert result["session_id"] == "ses_abc123"
+    assert result["status"] == "pending"
+
+
+@respx.mock
+def test_poll_session_complete():
+    respx.get(f"{BASE_URL}/v1/sessions/ses_abc123").mock(
+        return_value=httpx.Response(200, json=SESSION_POLL_COMPLETE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.poll_session("ses_abc123", "ps_secret456")
+    assert result["status"] == "complete"
+    assert result["score"]["grade"] == "B"
+    assert result["decision"] == "allow"
+
+
+@respx.mock
+def test_poll_session_sends_poll_secret_header():
+    route = respx.get(f"{BASE_URL}/v1/sessions/ses_abc123").mock(
+        return_value=httpx.Response(200, json=SESSION_POLL_PENDING_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.poll_session("ses_abc123", "ps_secret456")
+    assert route.calls.last.request.headers["x-poll-secret"] == "ps_secret456"
+
+
+@respx.mock
+def test_poll_session_raises_on_404():
+    respx.get(f"{BASE_URL}/v1/sessions/ses_bad").mock(
+        return_value=httpx.Response(404, json={"error": {"code": "not_found", "message": "Session not found"}})
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.poll_session("ses_bad", "ps_secret456")
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.code == "not_found"
+
+
+# ---------------------------------------------------------------------------
+# create_credential
+# ---------------------------------------------------------------------------
+
+CREDENTIAL_CREATE_PAYLOAD = {
+    "id": "cred_abc123",
+    "label": "My credential",
+    "token": "ak_full_secret_token",
+    "prefix": "ak_full",
+    "created_at": "2024-01-01T00:00:00Z",
+    "expires_at": "2024-04-01T00:00:00Z",
+}
+
+
+@respx.mock
+def test_create_credential_success():
+    respx.post(f"{BASE_URL}/v1/credentials").mock(return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = client.create_credential(label="My credential", ttl_days=90)
+    assert result["id"] == "cred_abc123"
+    assert result["token"] == "ak_full_secret_token"
+    assert result["label"] == "My credential"
+
+
+@respx.mock
+def test_create_credential_sends_body():
+    route = respx.post(f"{BASE_URL}/v1/credentials").mock(
+        return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.create_credential(label="My credential", ttl_days=90)
+    body = json.loads(route.calls.last.request.content)
+    assert body["label"] == "My credential"
+    assert body["ttl_days"] == 90
+
+
+@respx.mock
+def test_create_credential_omits_none_fields():
+    route = respx.post(f"{BASE_URL}/v1/credentials").mock(
+        return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.create_credential()
+    body = json.loads(route.calls.last.request.content)
+    assert "label" not in body
+    assert "ttl_days" not in body
+
+
+@respx.mock
+def test_create_credential_raises_on_error():
+    respx.post(f"{BASE_URL}/v1/credentials").mock(
+        return_value=httpx.Response(403, json={"error": {"code": "forbidden", "message": "Not allowed"}})
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.create_credential()
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.code == "forbidden"
+
+
+# ---------------------------------------------------------------------------
+# list_credentials
+# ---------------------------------------------------------------------------
+
+CREDENTIAL_LIST_PAYLOAD = {
+    "credentials": [
+        {
+            "id": "cred_abc123",
+            "label": "My credential",
+            "prefix": "ak_full",
+            "created_at": "2024-01-01T00:00:00Z",
+            "expires_at": "2024-04-01T00:00:00Z",
+            "last_used_at": None,
+        },
+        {
+            "id": "cred_def456",
+            "label": None,
+            "prefix": "ak_other",
+            "created_at": "2024-02-01T00:00:00Z",
+            "expires_at": None,
+            "last_used_at": "2024-03-01T00:00:00Z",
+        },
+    ],
+}
+
+
+@respx.mock
+def test_list_credentials_success():
+    respx.get(f"{BASE_URL}/v1/credentials").mock(return_value=httpx.Response(200, json=CREDENTIAL_LIST_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = client.list_credentials()
+    assert len(result["credentials"]) == 2
+    assert result["credentials"][0]["id"] == "cred_abc123"
+    assert result["credentials"][1]["id"] == "cred_def456"
+
+
+@respx.mock
+def test_list_credentials_empty():
+    respx.get(f"{BASE_URL}/v1/credentials").mock(return_value=httpx.Response(200, json={"credentials": []}))
+    client = AgentScore(api_key=API_KEY)
+    result = client.list_credentials()
+    assert result["credentials"] == []
+
+
+@respx.mock
+def test_list_credentials_raises_on_error():
+    respx.get(f"{BASE_URL}/v1/credentials").mock(
+        return_value=httpx.Response(401, json={"error": {"code": "unauthorized", "message": "Invalid API key"}})
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.list_credentials()
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.code == "unauthorized"
+
+
+# ---------------------------------------------------------------------------
+# revoke_credential
+# ---------------------------------------------------------------------------
+
+CREDENTIAL_REVOKE_PAYLOAD = {"ok": True}
+
+
+@respx.mock
+def test_revoke_credential_success():
+    respx.delete(f"{BASE_URL}/v1/credentials/cred_abc123").mock(
+        return_value=httpx.Response(200, json=CREDENTIAL_REVOKE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.revoke_credential("cred_abc123")
+    assert result["ok"] is True
+
+
+@respx.mock
+def test_revoke_credential_raises_on_404():
+    respx.delete(f"{BASE_URL}/v1/credentials/cred_bad").mock(
+        return_value=httpx.Response(404, json={"error": {"code": "not_found", "message": "Credential not found"}})
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.revoke_credential("cred_bad")
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.code == "not_found"
+
+
+# ---------------------------------------------------------------------------
+# Async: acreate_session
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_acreate_session_success():
+    respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = await client.acreate_session()
+    assert result["session_id"] == "ses_abc123"
+    assert result["poll_secret"] == "ps_secret456"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_acreate_session_with_first_class_fields():
+    route = respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.acreate_session(
+        context="wine purchase verification",
+        product_name="Cabernet Reserve 2022",
+    )
+    body = json.loads(route.calls.last.request.content)
+    assert body["context"] == "wine purchase verification"
+    assert body["product_name"] == "Cabernet Reserve 2022"
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Async: apoll_session
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_apoll_session_success():
+    respx.get(f"{BASE_URL}/v1/sessions/ses_abc123").mock(
+        return_value=httpx.Response(200, json=SESSION_POLL_COMPLETE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.apoll_session("ses_abc123", "ps_secret456")
+    assert result["status"] == "complete"
+    assert result["score"]["grade"] == "B"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_apoll_session_sends_poll_secret_header():
+    route = respx.get(f"{BASE_URL}/v1/sessions/ses_abc123").mock(
+        return_value=httpx.Response(200, json=SESSION_POLL_PENDING_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    await client.apoll_session("ses_abc123", "ps_secret456")
+    assert route.calls.last.request.headers["x-poll-secret"] == "ps_secret456"
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Async: acreate_credential
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_acreate_credential_success():
+    respx.post(f"{BASE_URL}/v1/credentials").mock(return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = await client.acreate_credential(label="My credential", ttl_days=90)
+    assert result["id"] == "cred_abc123"
+    assert result["token"] == "ak_full_secret_token"
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Async: alist_credentials
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_alist_credentials_success():
+    respx.get(f"{BASE_URL}/v1/credentials").mock(return_value=httpx.Response(200, json=CREDENTIAL_LIST_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = await client.alist_credentials()
+    assert len(result["credentials"]) == 2
+    assert result["credentials"][0]["id"] == "cred_abc123"
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Async: arevoke_credential
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_arevoke_credential_success():
+    respx.delete(f"{BASE_URL}/v1/credentials/cred_abc123").mock(
+        return_value=httpx.Response(200, json=CREDENTIAL_REVOKE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.arevoke_credential("cred_abc123")
+    assert result["ok"] is True
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_arevoke_credential_raises_on_404():
+    respx.delete(f"{BASE_URL}/v1/credentials/cred_bad").mock(
+        return_value=httpx.Response(404, json={"error": {"code": "not_found", "message": "Credential not found"}})
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        await client.arevoke_credential("cred_bad")
+    assert exc_info.value.status_code == 404
+    assert exc_info.value.code == "not_found"
+    await client.aclose()

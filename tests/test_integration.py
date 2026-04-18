@@ -73,23 +73,24 @@ def test_get_reputation_metadata_fields():
     assert "updated_at" in rep
 
 
-def test_assess_operator_level():
+def test_assess_flat_decision_shape():
     client = AgentScore(api_key=API_KEY, base_url=BASE_URL)
     result = client.assess(TEST_ADDRESS)
 
     assert "decision" in result
     assert isinstance(result["decision_reasons"], list)
-    assert isinstance(result["chains"], list)
-    assert isinstance(result["agents"], list)
-    assert "classification" not in result
+    assert result["identity_method"] == "wallet"
+    assert "operator_verification" in result
 
 
 def test_assess_policy_deny():
     client = AgentScore(api_key=API_KEY, base_url=BASE_URL)
-    result = client.assess(TEST_ADDRESS, policy={"min_score": 999})
+    result = client.assess(TEST_ADDRESS, policy={"require_kyc": True})
 
     assert result["decision"] == "deny"
-    assert len(result["decision_reasons"]) > 0
+    assert "kyc_required" in result["decision_reasons"]
+    assert "verify_url" in result
+    assert "/verify" in result["verify_url"]
 
 
 def test_get_reputation_operator_score():
@@ -107,7 +108,7 @@ def test_get_reputation_operator_score():
 def test_assess_then_get_reputation():
     client = AgentScore(api_key=API_KEY, base_url=BASE_URL)
     assessed = client.assess(TEST_ADDRESS)
-    assert "value" in assessed["score"]
+    assert "decision" in assessed
 
     rep = client.get_reputation(TEST_ADDRESS)
     assert "value" in rep["score"]

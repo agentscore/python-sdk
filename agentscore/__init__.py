@@ -4,6 +4,9 @@ from agentscore.client import AgentScore
 from agentscore.errors import AgentScoreError
 from agentscore.types import (
     AssessResponse,
+    CredentialCreateResponse,
+    CredentialItem,
+    CredentialListResponse,
     DecisionPolicy,
     EntityType,
     Grade,
@@ -11,6 +14,9 @@ from agentscore.types import (
     Reputation,
     ReputationResponse,
     ReputationStatus,
+    SessionCreateRequest,
+    SessionCreateResponse,
+    SessionPollResponse,
     VerificationLevel,
 )
 
@@ -20,6 +26,9 @@ __all__ = [
     "AgentScore",
     "AgentScoreError",
     "AssessResponse",
+    "CredentialCreateResponse",
+    "CredentialItem",
+    "CredentialListResponse",
     "DecisionPolicy",
     "EntityType",
     "Grade",
@@ -27,6 +36,9 @@ __all__ = [
     "Reputation",
     "ReputationResponse",
     "ReputationStatus",
+    "SessionCreateRequest",
+    "SessionCreateResponse",
+    "SessionPollResponse",
     "VerificationLevel",
     "__version__",
 ]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 Grade = Literal["A", "B", "C", "D", "F"]
 EntityType = Literal["agent", "service", "hybrid", "wallet", "bot", "unknown", "individual", "entity"]
@@ -8,9 +8,13 @@ ReputationStatus = Literal["scored", "stale", "known_unscored"]
 VerificationLevel = Literal["none", "wallet_claimed", "kyc_verified"]
 
 
-class Subject(TypedDict):
+class _SubjectRequired(TypedDict):
     chains: list[str]
+
+
+class Subject(_SubjectRequired, total=False):
     address: str
+    credential_prefix: str
 
 
 class Classification(TypedDict):
@@ -142,7 +146,6 @@ class _OperatorVerificationRequired(TypedDict):
 
 class OperatorVerification(_OperatorVerificationRequired, total=False):
     operator_type: str | None
-    claimed_at: str | None
     verified_at: str | None
 
 
@@ -159,33 +162,83 @@ class PolicyResult(TypedDict):
 
 
 class DecisionPolicy(TypedDict, total=False):
-    min_grade: Grade
-    min_score: int
-    require_verified_payment_activity: bool
     require_kyc: bool
     require_sanctions_clear: bool
     min_age: int
     blocked_jurisdictions: list[str]
+    allowed_jurisdictions: list[str]
     require_entity_type: str
 
 
 class _AssessResponseRequired(TypedDict):
-    subject: Subject
-    score: Score
-    chains: list[ChainEntry]
     decision: str | None
     decision_reasons: list[str]
+    identity_method: str
     on_the_fly: bool
-    data_semantics: str
-    caveats: list[str]
     updated_at: str | None
 
 
+class PolicyExplanation(TypedDict, total=False):
+    rule: str
+    passed: bool
+    required: object
+    actual: object
+    message: str
+    how_to_remedy: str | None
+
+
 class AssessResponse(_AssessResponseRequired, total=False):
-    operator_score: OperatorScore | None
-    reputation: Reputation | None
-    agents: list[AgentSummary]
     operator_verification: OperatorVerification
-    resolved_operator: str
+    resolved_operator: str | None
     verify_url: str
     policy_result: PolicyResult | None
+    explanation: NotRequired[list[PolicyExplanation]]
+
+
+class SessionCreateRequest(TypedDict, total=False):
+    context: str
+    product_name: str
+
+
+class SessionCreateResponse(TypedDict):
+    session_id: str
+    poll_secret: str
+    verify_url: str
+    poll_url: str
+    expires_at: str
+
+
+class _SessionPollResponseRequired(TypedDict):
+    session_id: str
+    status: str
+
+
+class SessionPollResponse(_SessionPollResponseRequired, total=False):
+    operator_token: str
+    completed_at: str
+    next_steps: NotRequired[dict]
+    retry_after_seconds: NotRequired[int]
+    token_ttl_seconds: NotRequired[int]
+
+
+class CredentialItem(TypedDict):
+    id: str
+    label: str | None
+    prefix: str
+    created_at: str
+    expires_at: str | None
+    last_used_at: str | None
+
+
+class CredentialCreateResponse(TypedDict):
+    id: str
+    label: str | None
+    credential: str
+    prefix: str
+    created_at: str
+    expires_at: str | None
+
+
+class CredentialListResponse(TypedDict):
+    credentials: list[CredentialItem]
+    account_verification: NotRequired[dict]
