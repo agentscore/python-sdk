@@ -574,7 +574,6 @@ def test_assess_sends_compliance_policy_fields():
         "require_sanctions_clear": True,
         "min_age": 90,
         "blocked_jurisdictions": ["KP", "IR"],
-        "require_entity_type": "agent",
     }
     client.assess(ADDRESS, policy=policy)
     body = json.loads(route.calls.last.request.content)
@@ -582,7 +581,6 @@ def test_assess_sends_compliance_policy_fields():
     assert body["policy"]["require_sanctions_clear"] is True
     assert body["policy"]["min_age"] == 90
     assert body["policy"]["blocked_jurisdictions"] == ["KP", "IR"]
-    assert body["policy"]["require_entity_type"] == "agent"
 
 
 @pytest.mark.asyncio

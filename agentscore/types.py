@@ -167,7 +167,6 @@ class DecisionPolicy(TypedDict, total=False):
     min_age: int
     blocked_jurisdictions: list[str]
     allowed_jurisdictions: list[str]
-    require_entity_type: str
 
 
 class _AssessResponseRequired(TypedDict):
