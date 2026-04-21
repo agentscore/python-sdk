@@ -27,12 +27,15 @@ class AgentScore:
         api_key: str,
         base_url: str = "https://api.agentscore.sh",
         timeout: float = 10.0,
+        user_agent: str | None = None,
     ):
         if not api_key:
             raise ValueError("AgentScore API key is required. Get one at https://agentscore.sh/sign-up")
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        default_ua = f"agentscore-py/{_pkg_version('agentscore-py')}"
+        self.user_agent = f"{user_agent} ({default_ua})" if user_agent else default_ua
         self._sync_client: httpx.Client | None = None
         self._async_client: httpx.AsyncClient | None = None
 
@@ -40,7 +43,7 @@ class AgentScore:
         return {
             "Accept": "application/json",
             "X-API-Key": self.api_key,
-            "User-Agent": f"agentscore-py/{_pkg_version('agentscore-py')}",
+            "User-Agent": self.user_agent,
         }
 
     def _get_sync_client(self) -> httpx.Client:
