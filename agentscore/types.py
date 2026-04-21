@@ -241,3 +241,15 @@ class CredentialCreateResponse(TypedDict):
 class CredentialListResponse(TypedDict):
     credentials: list[CredentialItem]
     account_verification: NotRequired[dict]
+
+
+Network = Literal["evm", "solana"]
+"""Key-derivation family for associate_wallet. EVM covers any EVM chain (Base, Tempo, Ethereum, …)
+because EOA addresses derive from the same private key on every EVM chain. Solana lives in its own
+namespace with a different key scheme."""
+
+
+class AssociateWalletResponse(TypedDict):
+    associated: bool
+    first_seen: bool
+    deduped: NotRequired[bool]

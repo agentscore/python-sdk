@@ -13,6 +13,7 @@ Python client for the AgentScore trust and reputation API.
 - `create_credential` / `acreate_credential` — create operator credential (24h TTL default)
 - `list_credentials` / `alist_credentials` — list active credentials
 - `revoke_credential` / `arevoke_credential` — revoke a credential
+- `associate_wallet` / `aassociate_wallet` — report a signer wallet seen paying under a credential (TEC-189). Accepts optional `idempotency_key` (payment intent id / tx hash) so retries don't inflate transaction_count.
 
 ## Architecture
 

@@ -73,6 +73,19 @@ credentials = client.list_credentials()
 client.revoke_credential(cred["id"])
 ```
 
+### Report an Agent's Wallet (Cross-Merchant Attribution)
+
+After an agent authenticated via `operator_token` completes a payment, report the signer wallet so AgentScore can build a cross-merchant credential↔wallet profile. Fire-and-forget — `first_seen` is informational only. `network` is the key-derivation family: `"evm"` for any EVM chain (Base, Tempo, Ethereum, …) or `"solana"` for Solana.
+
+```python
+client.associate_wallet(
+    operator_token="opc_...",
+    wallet_address=signer_from_payment,  # e.g. EIP-3009 `from` or Tempo MPP DID address
+    network="evm",
+    idempotency_key=payment_intent_id,  # optional — agent retries of the same payment no-op
+)
+```
+
 ### Async
 
 All methods have async variants prefixed with `a`:
@@ -88,6 +101,11 @@ async with AgentScore(api_key="as_live_...") as client:
     cred = await client.acreate_credential(label="my-agent")
     await client.alist_credentials()
     await client.arevoke_credential(cred["id"])
+    await client.aassociate_wallet(
+        operator_token="opc_...",
+        wallet_address="0x...",
+        network="evm",
+    )
 ```
 
 ### Context Manager

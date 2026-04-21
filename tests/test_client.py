@@ -1138,3 +1138,213 @@ async def test_arevoke_credential_raises_on_404():
     assert exc_info.value.status_code == 404
     assert exc_info.value.code == "not_found"
     await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# associate_wallet
+# ---------------------------------------------------------------------------
+
+ASSOCIATE_TOKEN = "opc_" + "a" * 48
+ASSOCIATE_WALLET = "0xabcdef1234567890abcdef1234567890abcdef12"
+ASSOCIATE_NETWORK = "evm"
+
+
+@respx.mock
+def test_associate_wallet_returns_first_seen_true():
+    respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": True}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert result == {"associated": True, "first_seen": True}
+
+
+@respx.mock
+def test_associate_wallet_sends_snake_case_body():
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": False}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert route.called
+    body = json.loads(route.calls[0].request.content.decode())
+    assert body == {
+        "operator_token": ASSOCIATE_TOKEN,
+        "wallet_address": ASSOCIATE_WALLET,
+        "network": ASSOCIATE_NETWORK,
+    }
+
+
+@respx.mock
+def test_associate_wallet_forwards_idempotency_key():
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": False, "deduped": True}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key="pi_abc")
+    assert result == {"associated": True, "first_seen": False, "deduped": True}
+    body = json.loads(route.calls[0].request.content.decode())
+    assert body["idempotency_key"] == "pi_abc"
+
+
+@respx.mock
+def test_associate_wallet_omits_idempotency_key_when_not_provided():
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": True}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    body = json.loads(route.calls[0].request.content.decode())
+    assert "idempotency_key" not in body
+
+
+@respx.mock
+def test_associate_wallet_omits_empty_string_idempotency_key():
+    """Empty string is not a valid key — match node-sdk behavior and skip forwarding."""
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": True}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key="")
+    body = json.loads(route.calls[0].request.content.decode())
+    assert "idempotency_key" not in body
+
+
+@respx.mock
+def test_associate_wallet_raises_on_401_invalid_credential():
+    """Matches /v1/assess's anti-enumeration status code for unknown credentials."""
+    respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(
+            401,
+            json={"error": {"code": "invalid_credential", "message": "Operator credential not found"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.code == "invalid_credential"
+
+
+@respx.mock
+def test_associate_wallet_raises_on_400_invalid_wallet():
+    respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(
+            400,
+            json={"error": {"code": "invalid_wallet", "message": "bad wallet"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.associate_wallet(ASSOCIATE_TOKEN, "0xnope", ASSOCIATE_NETWORK)
+    assert exc_info.value.code == "invalid_wallet"
+
+
+@respx.mock
+def test_associate_wallet_raises_on_402_payment_required():
+    respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(
+            402,
+            json={"error": {"code": "payment_required", "message": "paid only"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert exc_info.value.status_code == 402
+    assert exc_info.value.code == "payment_required"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassociate_wallet_returns_first_seen_true():
+    respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": True}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.aassociate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert result == {"associated": True, "first_seen": True}
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassociate_wallet_sends_snake_case_body():
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": False}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    await client.aassociate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert route.called
+    body = json.loads(route.calls[0].request.content.decode())
+    assert body == {
+        "operator_token": ASSOCIATE_TOKEN,
+        "wallet_address": ASSOCIATE_WALLET,
+        "network": ASSOCIATE_NETWORK,
+    }
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassociate_wallet_forwards_idempotency_key():
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": False, "deduped": True}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.aassociate_wallet(
+        ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key="pi_abc"
+    )
+    assert result == {"associated": True, "first_seen": False, "deduped": True}
+    body = json.loads(route.calls[0].request.content.decode())
+    assert body["idempotency_key"] == "pi_abc"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassociate_wallet_omits_empty_string_idempotency_key():
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"associated": True, "first_seen": True}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    await client.aassociate_wallet(
+        ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key=""
+    )
+    body = json.loads(route.calls[0].request.content.decode())
+    assert "idempotency_key" not in body
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassociate_wallet_raises_on_401_invalid_credential():
+    respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(
+            401,
+            json={"error": {"code": "invalid_credential", "message": "Operator credential not found"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        await client.aassociate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.code == "invalid_credential"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassociate_wallet_raises_on_402_payment_required():
+    respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(
+            402,
+            json={"error": {"code": "payment_required", "message": "paid only"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        await client.aassociate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK)
+    assert exc_info.value.status_code == 402
+    assert exc_info.value.code == "payment_required"
+    await client.aclose()
