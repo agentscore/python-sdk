@@ -1308,9 +1308,7 @@ async def test_aassociate_wallet_omits_empty_string_idempotency_key():
         return_value=httpx.Response(200, json={"associated": True, "first_seen": True}),
     )
     client = AgentScore(api_key=API_KEY)
-    await client.aassociate_wallet(
-        ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key=""
-    )
+    await client.aassociate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key="")
     body = json.loads(route.calls[0].request.content.decode())
     assert "idempotency_key" not in body
     await client.aclose()
