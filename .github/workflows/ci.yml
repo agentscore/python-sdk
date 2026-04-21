@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   ci:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     steps:
       - uses: useblacksmith/checkout@v1
       - uses: astral-sh/setup-uv@v7
