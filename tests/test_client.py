@@ -386,6 +386,21 @@ def test_user_agent_header_includes_version():
     assert request.headers["user-agent"] == f"agentscore-py/{version('agentscore-py')}"
 
 
+@respx.mock
+def test_user_agent_header_prepends_custom_user_agent():
+    """Custom user_agent should be rendered as '{custom} ({default})'."""
+    from importlib.metadata import version
+
+    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD),
+    )
+    client = AgentScore(api_key=API_KEY, user_agent="my-app/1.2.3")
+    client.get_reputation(ADDRESS)
+    request = respx.calls[0].request
+    expected = f"my-app/1.2.3 (agentscore-py/{version('agentscore-py')})"
+    assert request.headers["user-agent"] == expected
+
+
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
