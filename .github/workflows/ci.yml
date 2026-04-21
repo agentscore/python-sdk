@@ -9,9 +9,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     runs-on: blacksmith-2vcpu-ubuntu-2404-arm
+    timeout-minutes: 10
     steps:
       - uses: useblacksmith/checkout@v1
       - uses: astral-sh/setup-uv@v7
