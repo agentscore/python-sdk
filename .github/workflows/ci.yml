@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: useblacksmith/checkout@v1
       - uses: astral-sh/setup-uv@v7
-      - uses: useblacksmith/cache@v1
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/uv
