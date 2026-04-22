@@ -56,7 +56,7 @@ Bootstrap identity for first-time agents:
 
 ```python
 session = client.create_session()
-print(session["verify_url"], session["poll_secret"])
+print(session["verify_url"], session["poll_url"], session["poll_secret"])
 
 status = client.poll_session(session["session_id"], session["poll_secret"])
 if status["status"] == "verified":

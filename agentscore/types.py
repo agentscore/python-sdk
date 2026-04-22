@@ -207,6 +207,17 @@ class SessionCreateResponse(TypedDict):
     expires_at: str
 
 
+class SessionPollNextSteps(TypedDict, total=False):
+    action: str
+    user_message: str
+    header_name: str
+    poll_interval_seconds: int
+    eta_message: str
+    # Present when action == "contact_support" (e.g. sanctions "flagged" status).
+    support_email: str
+    support_subject: str
+
+
 class _SessionPollResponseRequired(TypedDict):
     session_id: str
     status: str
@@ -215,7 +226,7 @@ class _SessionPollResponseRequired(TypedDict):
 class SessionPollResponse(_SessionPollResponseRequired, total=False):
     operator_token: str
     completed_at: str
-    next_steps: NotRequired[dict]
+    next_steps: NotRequired[SessionPollNextSteps]
     retry_after_seconds: NotRequired[int]
     token_ttl_seconds: NotRequired[int]
 

@@ -20,6 +20,7 @@ jobs:
     steps:
       - uses: useblacksmith/checkout@v1
       - uses: astral-sh/setup-uv@v7
+      - run: uv python install 3.12
       - uses: actions/cache@v4
         with:
           path: |
@@ -30,5 +31,6 @@ jobs:
       - run: uv sync --frozen --all-extras
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: uv run ty check agentscore/
       - run: uv run vulture . vulture_whitelist.py --min-confidence 80 --exclude .venv
       - run: uv run pytest tests/ --cov=agentscore --cov-report=term-missing

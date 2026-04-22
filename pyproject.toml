@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentscore-py"
-version = "1.7.0"
+version = "1.8.0"
 description = "Python client for the AgentScore trust and reputation API"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 keywords = ["agentscore", "x402", "erc-8004", "agent", "trust", "reputation", "wallet", "blockchain", "ai-agent", "agentic-payments"]
 dependencies = [
     "httpx>=0.25.0,<1.0.0",
@@ -42,9 +42,13 @@ packages = ["agentscore"]
 [dependency-groups]
 dev = [
     "ruff>=0.11.0",
+    "ty>=0.0.32",
     "vulture>=2.15",
     "pytest-cov>=6.0",
     "respx>=0.22.0",
     "pytest-asyncio>=1.2.0",
     "python-dotenv>=1.2.1",
 ]
+
+[tool.ty.src]
+include = ["agentscore"]
