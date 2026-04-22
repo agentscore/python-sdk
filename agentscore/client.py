@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+import logging
 from importlib.metadata import version as _pkg_version
 from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from agentscore.errors import AgentScoreError
+
+logger = logging.getLogger("agentscore")
+
+# Server truncates idempotency_key at 200 chars; warn the caller past that so two
+# distinct payments that share the first 200 chars don't silently dedup.
+_IDEMPOTENCY_KEY_MAX = 200
 
 if TYPE_CHECKING:
     from agentscore.types import (
@@ -209,6 +216,11 @@ class AgentScore:
         # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
         # node-sdk's behavior of only forwarding when the key actually has content.
         if idempotency_key:
+            if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
+                logger.warning(
+                    "associate_wallet: idempotency_key longer than %d chars will be truncated server-side.",
+                    _IDEMPOTENCY_KEY_MAX,
+                )
             body["idempotency_key"] = idempotency_key
         client = self._get_sync_client()
         response = client.post("/v1/credentials/wallets", json=body)
@@ -316,6 +328,11 @@ class AgentScore:
         # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
         # node-sdk's behavior of only forwarding when the key actually has content.
         if idempotency_key:
+            if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
+                logger.warning(
+                    "aassociate_wallet: idempotency_key longer than %d chars will be truncated server-side.",
+                    _IDEMPOTENCY_KEY_MAX,
+                )
             body["idempotency_key"] = idempotency_key
         client = self._get_async_client()
         response = await client.post("/v1/credentials/wallets", json=body)
