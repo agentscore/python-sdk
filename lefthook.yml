@@ -9,6 +9,9 @@ pre-commit:
       run: uv run ruff format --check {staged_files}
 
 pre-push:
+  parallel: true
   commands:
+    ty:
+      run: uv run ty check agentscore/
     vulture:
       run: uv run vulture . vulture_whitelist.py --min-confidence 80 --exclude .venv

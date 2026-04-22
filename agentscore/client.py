@@ -73,7 +73,7 @@ class AgentScore:
             )
         return self._async_client
 
-    def _handle_response(self, response: httpx.Response) -> dict:
+    def _handle_response(self, response: httpx.Response) -> Any:
         if response.status_code == 429:
             retry_after = response.headers.get("retry-after", "1")
             raise AgentScoreError(

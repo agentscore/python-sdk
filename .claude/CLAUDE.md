@@ -28,9 +28,10 @@ Single-package Python library published to PyPI.
 
 - **uv** — package manager. Use `uv sync`, `uv run`.
 - **ruff** — linting + formatting. `uv run ruff check .` and `uv run ruff format --check .`.
+- **ty** — type checker (Astral). `uv run ty check agentscore/`.
 - **vulture** — dead code detection.
 - **pytest** — tests. `uv run pytest tests/`.
-- **Lefthook** — git hooks. Pre-commit: ruff. Pre-push: vulture.
+- **Lefthook** — git hooks. Pre-commit: ruff. Pre-push: ty + vulture (parallel).
 
 ## Key Commands
 
@@ -38,6 +39,7 @@ Single-package Python library published to PyPI.
 uv sync --all-extras
 uv run ruff check .
 uv run ruff format .
+uv run ty check agentscore/
 uv run pytest tests/
 ```
 
@@ -45,7 +47,7 @@ uv run pytest tests/
 
 1. Create a branch
 2. Make changes
-3. Lefthook runs ruff on commit, vulture on push
+3. Lefthook runs ruff on commit, ty + vulture on push
 4. Open a PR — CI runs automatically
 5. Merge (squash)
 
