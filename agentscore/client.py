@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from importlib.metadata import version as _pkg_version
 from typing import TYPE_CHECKING, Any
 
@@ -7,12 +8,20 @@ import httpx
 
 from agentscore.errors import AgentScoreError
 
+logger = logging.getLogger("agentscore")
+
+# Server truncates idempotency_key at 200 chars; warn the caller past that so two
+# distinct payments that share the first 200 chars don't silently dedup.
+_IDEMPOTENCY_KEY_MAX = 200
+
 if TYPE_CHECKING:
     from agentscore.types import (
         AssessResponse,
+        AssociateWalletResponse,
         CredentialCreateResponse,
         CredentialListResponse,
         DecisionPolicy,
+        Network,
         ReputationResponse,
         SessionCreateResponse,
         SessionPollResponse,
@@ -182,6 +191,41 @@ class AgentScore:
         response = client.delete(f"/v1/credentials/{id}")
         return self._handle_response(response)
 
+    def associate_wallet(
+        self,
+        operator_token: str,
+        wallet_address: str,
+        network: Network,
+        idempotency_key: str | None = None,
+    ) -> AssociateWalletResponse:
+        """Report that a wallet paid under an operator credential.
+
+        ``network`` is the key-derivation family (``"evm"`` or ``"solana"``) — EVM EOAs share
+        identity across every EVM chain (Base, Tempo, Ethereum, …) so one value covers them all.
+
+        ``idempotency_key`` is optional — pass a stable per-payment key (e.g., payment intent id,
+        x402 tx hash) so agent retries of the same logical payment don't inflate transaction_count.
+
+        Fire-and-forget friendly — the returned ``first_seen`` boolean is informational only.
+        """
+        body: dict[str, Any] = {
+            "operator_token": operator_token,
+            "wallet_address": wallet_address,
+            "network": network,
+        }
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
+        # node-sdk's behavior of only forwarding when the key actually has content.
+        if idempotency_key:
+            if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
+                logger.warning(
+                    "associate_wallet: idempotency_key longer than %d chars will be truncated server-side.",
+                    _IDEMPOTENCY_KEY_MAX,
+                )
+            body["idempotency_key"] = idempotency_key
+        client = self._get_sync_client()
+        response = client.post("/v1/credentials/wallets", json=body)
+        return self._handle_response(response)
+
     # --- Async methods ---
 
     async def aget_reputation(self, address: str, chain: str | None = None) -> ReputationResponse:
@@ -266,6 +310,32 @@ class AgentScore:
         """Revoke an API credential by ID."""
         client = self._get_async_client()
         response = await client.delete(f"/v1/credentials/{id}")
+        return self._handle_response(response)
+
+    async def aassociate_wallet(
+        self,
+        operator_token: str,
+        wallet_address: str,
+        network: Network,
+        idempotency_key: str | None = None,
+    ) -> AssociateWalletResponse:
+        """Async variant of :meth:`associate_wallet`."""
+        body: dict[str, Any] = {
+            "operator_token": operator_token,
+            "wallet_address": wallet_address,
+            "network": network,
+        }
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
+        # node-sdk's behavior of only forwarding when the key actually has content.
+        if idempotency_key:
+            if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
+                logger.warning(
+                    "aassociate_wallet: idempotency_key longer than %d chars will be truncated server-side.",
+                    _IDEMPOTENCY_KEY_MAX,
+                )
+            body["idempotency_key"] = idempotency_key
+        client = self._get_async_client()
+        response = await client.post("/v1/credentials/wallets", json=body)
         return self._handle_response(response)
 
     def close(self):

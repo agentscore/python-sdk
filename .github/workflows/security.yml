@@ -16,7 +16,7 @@ permissions:
 jobs:
   osv-scan:
     name: Dependency Scan
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     steps:
       - uses: useblacksmith/checkout@v1
@@ -31,7 +31,7 @@ jobs:
 
   pip-audit:
     name: Python Audit
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     timeout-minutes: 5
     steps:
       - uses: useblacksmith/checkout@v1
