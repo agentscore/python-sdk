@@ -189,6 +189,10 @@ class PolicyExplanation(TypedDict, total=False):
 class AssessResponse(_AssessResponseRequired, total=False):
     operator_verification: OperatorVerification
     resolved_operator: str | None
+    # TEC-226: wallets linked to the same operator as the resolved identity. Populated on
+    # allow responses; omitted on denials to avoid leaking the linked set for flagged
+    # operators. Capped at 100 entries.
+    linked_wallets: list[str]
     verify_url: str
     policy_result: PolicyResult | None
     explanation: NotRequired[list[PolicyExplanation]]
