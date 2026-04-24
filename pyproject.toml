@@ -34,7 +34,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=agentscore --cov-report=term-missing --cov-fail-under=94"
+addopts = "--cov=agentscore --cov-report=term-missing --cov-fail-under=95"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agentscore"]
