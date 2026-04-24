@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://docs.agentscore.sh"
+Homepage = "https://agentscore.sh"
 Repository = "https://github.com/agentscore/python-sdk"
 Issues = "https://github.com/agentscore/python-sdk/issues"
 
