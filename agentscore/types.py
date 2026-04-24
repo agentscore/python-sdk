@@ -199,12 +199,17 @@ class SessionCreateRequest(TypedDict, total=False):
     product_name: str
 
 
-class SessionCreateResponse(TypedDict):
+class _SessionCreateResponseRequired(TypedDict):
     session_id: str
     poll_secret: str
     verify_url: str
     poll_url: str
     expires_at: str
+
+
+class SessionCreateResponse(_SessionCreateResponseRequired, total=False):
+    # Cross-merchant memory hint on first session creation (TEC-227).
+    agent_memory: AgentMemoryHint
 
 
 class SessionPollNextSteps(TypedDict, total=False):
@@ -264,3 +269,127 @@ class AssociateWalletResponse(TypedDict):
     associated: bool
     first_seen: bool
     deduped: NotRequired[bool]
+
+
+# ---------------------------------------------------------------------------
+# Denial codes (TEC-226, TEC-218) — added in 1.9.0
+# ---------------------------------------------------------------------------
+
+
+DenialCode = Literal[
+    # Pre-1.9.0
+    "operator_verification_required",
+    "compliance_denied",
+    "compliance_error",
+    "wallet_not_trusted",
+    "missing_identity",
+    "identity_verification_required",
+    "payment_required",
+    "api_error",
+    "kyc_required",
+    # Added in 1.9.0 (TEC-226)
+    "wallet_signer_mismatch",
+    "wallet_auth_requires_wallet_signing",
+    # Added in 1.9.0 (TEC-218)
+    "token_expired",
+    "token_revoked",
+]
+"""Denial codes returned by the gate in 403/402 error bodies. Additive — old codes retained for
+backward compat. New codes in 1.9.0 let agents pick the right remediation without natural-language
+parsing."""
+
+
+NextStepsAction = Literal[
+    # Pre-1.9.0
+    "poll_for_credential",
+    "contact_support",
+    "retry",
+    "retry_once_then_contact_support",
+    "regenerate_payment_credential",
+    "none",
+    "done",
+    # Added in 1.9.0
+    "send_existing_identity",
+    "mint_new_credential",
+    "use_operator_token",
+    "regenerate_payment_from_linked_wallet",
+]
+"""Recommended agent action encoded in next_steps.action."""
+
+
+class AgentMemoryIdentityPaths(TypedDict):
+    wallet: str
+    operator_token: str
+
+
+class AgentMemoryHint(TypedDict):
+    """Structured hint emitted on bootstrap denials and POST /v1/sessions success (TEC-227).
+
+    LLM-hosted agents should save this to their long-term memory so future AgentScore encounters
+    skip the cold-start session flow. Contents are the pattern, not secrets —
+    do_not_persist_in_memory names bearer credentials that belong in a credential store.
+    """
+
+    save_for_future_agentscore_gates: bool
+    pattern_summary: str
+    quickstart: str
+    identity_check_endpoint: str
+    list_wallets_endpoint: NotRequired[str]
+    identity_paths: AgentMemoryIdentityPaths
+    bootstrap: str
+    do_not_persist_in_memory: list[str]
+    persist_in_credential_store: list[str]
+
+
+class _WalletSignerMismatchNextSteps(TypedDict):
+    action: Literal["regenerate_payment_from_linked_wallet"]
+
+
+class WalletSignerMismatchNextSteps(_WalletSignerMismatchNextSteps, total=False):
+    user_message: str
+    learn_more_url: str
+
+
+class _WalletSignerMismatchBodyRequired(TypedDict):
+    error: dict  # {"code": "wallet_signer_mismatch", "message": str}
+    claimed_operator: str
+    actual_signer_operator: str | None
+    linked_wallets: list[str]
+    next_steps: WalletSignerMismatchNextSteps
+
+
+class WalletSignerMismatchBody(_WalletSignerMismatchBodyRequired, total=False):
+    """403 body for X-Wallet-Address + mismatched-signer rejections (TEC-226).
+
+    Returned when the claimed wallet's operator doesn't match the payment signer's operator.
+    actual_signer_operator is None if the signer isn't linked to any operator.
+    """
+
+    expected_signer: str
+    actual_signer: str
+    agent_memory: AgentMemoryHint
+
+
+class _WalletAuthRequiresSigningNextSteps(TypedDict):
+    action: Literal["use_operator_token"]
+
+
+class WalletAuthRequiresSigningNextSteps(_WalletAuthRequiresSigningNextSteps, total=False):
+    user_message: str
+    signer_capable_rails: list[str]
+    learn_more_url: str
+
+
+class _WalletAuthRequiresSigningBodyRequired(TypedDict):
+    error: dict  # {"code": "wallet_auth_requires_wallet_signing", "message": str}
+    next_steps: WalletAuthRequiresSigningNextSteps
+
+
+class WalletAuthRequiresSigningBody(_WalletAuthRequiresSigningBodyRequired, total=False):
+    """403 body for X-Wallet-Address + signer-less rail rejections (TEC-226).
+
+    Returned when X-Wallet-Address is used with a payment rail that has no wallet signer
+    (SPT, card). Agent should switch to X-Operator-Token for those rails.
+    """
+
+    agent_memory: AgentMemoryHint
