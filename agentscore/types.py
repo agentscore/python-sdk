@@ -203,6 +203,20 @@ class SessionCreateRequest(TypedDict, total=False):
     product_name: str
 
 
+class SessionCreateNextSteps(TypedDict, total=False):
+    """Structured action guidance on POST /v1/sessions success.
+
+    action is always ``deliver_verify_url_and_poll`` — tells the agent to share verify_url
+    with the user and poll poll_url with X-Poll-Secret until an operator_token is issued.
+    """
+
+    action: NextStepsAction
+    poll_interval_seconds: int
+    poll_secret_header: str
+    steps: list[str]
+    user_message: str
+
+
 class _SessionCreateResponseRequired(TypedDict):
     session_id: str
     poll_secret: str
@@ -212,12 +226,14 @@ class _SessionCreateResponseRequired(TypedDict):
 
 
 class SessionCreateResponse(_SessionCreateResponseRequired, total=False):
+    # Structured next_steps with action=deliver_verify_url_and_poll.
+    next_steps: SessionCreateNextSteps
     # Cross-merchant memory hint on first session creation.
     agent_memory: AgentMemoryHint
 
 
 class SessionPollNextSteps(TypedDict, total=False):
-    action: str
+    action: NextStepsAction
     user_message: str
     header_name: str
     poll_interval_seconds: int
@@ -367,11 +383,11 @@ class AgentMemoryHint(TypedDict):
     persist_in_credential_store: list[str]
 
 
-class _WalletSignerMismatchNextSteps(TypedDict):
-    action: Literal["regenerate_payment_from_linked_wallet"]
+class _WalletSignerMismatchNextStepsRequired(TypedDict):
+    action: NextStepsAction
 
 
-class WalletSignerMismatchNextSteps(_WalletSignerMismatchNextSteps, total=False):
+class WalletSignerMismatchNextSteps(_WalletSignerMismatchNextStepsRequired, total=False):
     user_message: str
     learn_more_url: str
 
@@ -381,7 +397,6 @@ class _WalletSignerMismatchBodyRequired(TypedDict):
     claimed_operator: str
     actual_signer_operator: str | None
     linked_wallets: list[str]
-    next_steps: WalletSignerMismatchNextSteps
 
 
 class WalletSignerMismatchBody(_WalletSignerMismatchBodyRequired, total=False):
@@ -389,18 +404,30 @@ class WalletSignerMismatchBody(_WalletSignerMismatchBodyRequired, total=False):
 
     Returned when the claimed wallet's operator doesn't match the payment signer's operator.
     actual_signer_operator is None if the signer isn't linked to any operator.
+
+    Action copy surfaces via one of two paths:
+    - ``agent_instructions``: JSON-encoded ``{action, steps, user_message}`` set by the
+      gate's default marshaller (action is typically ``resign_or_switch_to_operator_token``).
+    - ``next_steps``: structured object set by merchants who override the gate default
+      (action may be ``regenerate_payment_from_linked_wallet`` or any NextStepsAction).
+
+    Agents should check for whichever is present.
     """
 
     expected_signer: str
     actual_signer: str
+    agent_instructions: str
+    next_steps: WalletSignerMismatchNextSteps
     agent_memory: AgentMemoryHint
 
 
-class _WalletAuthRequiresSigningNextSteps(TypedDict):
-    action: Literal["use_operator_token"]
+class _WalletAuthRequiresSigningNextStepsRequired(TypedDict):
+    action: NextStepsAction
 
 
-class WalletAuthRequiresSigningNextSteps(_WalletAuthRequiresSigningNextSteps, total=False):
+class WalletAuthRequiresSigningNextSteps(
+    _WalletAuthRequiresSigningNextStepsRequired, total=False
+):
     user_message: str
     signer_capable_rails: list[str]
     learn_more_url: str
@@ -408,7 +435,6 @@ class WalletAuthRequiresSigningNextSteps(_WalletAuthRequiresSigningNextSteps, to
 
 class _WalletAuthRequiresSigningBodyRequired(TypedDict):
     error: dict  # {"code": "wallet_auth_requires_wallet_signing", "message": str}
-    next_steps: WalletAuthRequiresSigningNextSteps
 
 
 class WalletAuthRequiresSigningBody(_WalletAuthRequiresSigningBodyRequired, total=False):
@@ -416,6 +442,14 @@ class WalletAuthRequiresSigningBody(_WalletAuthRequiresSigningBodyRequired, tota
 
     Returned when X-Wallet-Address is used with a payment rail that has no wallet signer
     (SPT, card). Agent should switch to X-Operator-Token for those rails.
+
+    Action copy surfaces via one of two paths:
+    - ``agent_instructions``: JSON-encoded ``{action, steps, user_message}`` set by the
+      gate's default marshaller (action is typically ``switch_to_operator_token``).
+    - ``next_steps``: structured object set by merchants who override the gate default
+      (action may be ``use_operator_token`` or any NextStepsAction).
     """
 
+    agent_instructions: str
+    next_steps: WalletAuthRequiresSigningNextSteps
     agent_memory: AgentMemoryHint
