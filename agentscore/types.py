@@ -267,6 +267,11 @@ class CredentialListResponse(TypedDict):
     account_verification: NotRequired[dict]
 
 
+class CredentialRevokeResponse(TypedDict):
+    id: str
+    revoked: Literal[True]
+
+
 Network = Literal["evm", "solana"]
 """Key-derivation family for associate_wallet. EVM covers any EVM chain (Base, Tempo, Ethereum, …)
 because EOA addresses derive from the same private key on every EVM chain. Solana lives in its own

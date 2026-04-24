@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         AssociateWalletResponse,
         CredentialCreateResponse,
         CredentialListResponse,
+        CredentialRevokeResponse,
         DecisionPolicy,
         Network,
         ReputationResponse,
@@ -185,7 +186,7 @@ class AgentScore:
         response = client.get("/v1/credentials")
         return self._handle_response(response)
 
-    def revoke_credential(self, id: str) -> dict:
+    def revoke_credential(self, id: str) -> CredentialRevokeResponse:
         """Revoke an API credential by ID."""
         client = self._get_sync_client()
         response = client.delete(f"/v1/credentials/{id}")
@@ -306,7 +307,7 @@ class AgentScore:
         response = await client.get("/v1/credentials")
         return self._handle_response(response)
 
-    async def arevoke_credential(self, id: str) -> dict:
+    async def arevoke_credential(self, id: str) -> CredentialRevokeResponse:
         """Revoke an API credential by ID."""
         client = self._get_async_client()
         response = await client.delete(f"/v1/credentials/{id}")
