@@ -4,16 +4,18 @@ Python client for the AgentScore trust and reputation API.
 
 ## Identity Model
 
+Two identity paths: `X-Wallet-Address` (wallet-based) and `X-Operator-Token` (credential-based). `assess` responses include `resolved_operator` and `linked_wallets[]` (same-operator sibling wallets — all resolve to the same canonical operator). `create_session` and `create_credential` responses include an `agent_memory` cross-merchant pattern hint. `create_session` also returns `next_steps.action="deliver_verify_url_and_poll"` + polling instructions. `poll_session` returns `next_steps.action` values: `continue_polling`, `retry_merchant_request_with_operator_token`, `use_stored_operator_token`, `create_new_session`, `verification_failed`, `contact_support`.
+
 ## Methods (sync + async)
 
 - `get_reputation` / `aget_reputation` — cached reputation lookup (free)
-- `assess` / `aassess` — identity gate with policy (paid). Accepts `operator_token` for non-wallet agents.
-- `create_session` / `acreate_session` — create verification session
-- `poll_session` / `apoll_session` — poll session status, returns credential when verified
-- `create_credential` / `acreate_credential` — create operator credential (24h TTL default)
+- `assess` / `aassess` — identity gate with policy (paid). Accepts `operator_token` for non-wallet agents. Response includes `linked_wallets[]` and `resolved_operator`.
+- `create_session` / `acreate_session` — create verification session. Returns `agent_memory` + `next_steps`.
+- `poll_session` / `apoll_session` — poll session status, returns credential when verified, plus `next_steps.action`.
+- `create_credential` / `acreate_credential` — create operator credential (24h TTL default). Response includes `agent_memory`.
 - `list_credentials` / `alist_credentials` — list active credentials
 - `revoke_credential` / `arevoke_credential` — revoke a credential
-- `associate_wallet` / `aassociate_wallet` — report a signer wallet seen paying under a credential (TEC-189). Accepts optional `idempotency_key` (payment intent id / tx hash) so retries don't inflate transaction_count.
+- `associate_wallet` / `aassociate_wallet` — report a signer wallet seen paying under a credential. Accepts optional `idempotency_key` (payment intent id / tx hash) so retries don't inflate transaction_count.
 
 ## Architecture
 
