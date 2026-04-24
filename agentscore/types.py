@@ -189,9 +189,9 @@ class PolicyExplanation(TypedDict, total=False):
 class AssessResponse(_AssessResponseRequired, total=False):
     operator_verification: OperatorVerification
     resolved_operator: str | None
-    # TEC-226: wallets linked to the same operator as the resolved identity. Populated on
-    # allow responses; omitted on denials to avoid leaking the linked set for flagged
-    # operators. Capped at 100 entries.
+    # Wallets linked to the same operator as the resolved identity. Populated on allow
+    # responses; omitted on denials to avoid leaking the linked set for flagged operators.
+    # Capped at 100 entries.
     linked_wallets: list[str]
     verify_url: str
     policy_result: PolicyResult | None
@@ -212,7 +212,7 @@ class _SessionCreateResponseRequired(TypedDict):
 
 
 class SessionCreateResponse(_SessionCreateResponseRequired, total=False):
-    # Cross-merchant memory hint on first session creation (TEC-227).
+    # Cross-merchant memory hint on first session creation.
     agent_memory: AgentMemoryHint
 
 
@@ -249,13 +249,17 @@ class CredentialItem(TypedDict):
     last_used_at: str | None
 
 
-class CredentialCreateResponse(TypedDict):
+class _CredentialCreateResponseRequired(TypedDict):
     id: str
     label: str | None
     credential: str
     prefix: str
     created_at: str
-    expires_at: str | None
+    expires_at: str
+
+
+class CredentialCreateResponse(_CredentialCreateResponseRequired, total=False):
+    agent_memory: AgentMemoryHint
 
 
 class CredentialListResponse(TypedDict):
@@ -276,12 +280,11 @@ class AssociateWalletResponse(TypedDict):
 
 
 # ---------------------------------------------------------------------------
-# Denial codes (TEC-226, TEC-218) — added in 1.9.0
+# Denial codes
 # ---------------------------------------------------------------------------
 
 
 DenialCode = Literal[
-    # Pre-1.9.0
     "operator_verification_required",
     "compliance_denied",
     "compliance_error",
@@ -291,20 +294,19 @@ DenialCode = Literal[
     "payment_required",
     "api_error",
     "kyc_required",
-    # Added in 1.9.0 (TEC-226)
+    # Wallet-signer binding — claimed X-Wallet-Address must resolve to the same operator
+    # as the payment signer; wallet-auth is rejected on rails with no wallet signer.
     "wallet_signer_mismatch",
     "wallet_auth_requires_wallet_signing",
-    # Added in 1.9.0 (TEC-218)
+    # Granular credential-state denials so agents know whether to retry, rotate, or re-KYC.
     "token_expired",
     "token_revoked",
 ]
-"""Denial codes returned by the gate in 403/402 error bodies. Additive — old codes retained for
-backward compat. New codes in 1.9.0 let agents pick the right remediation without natural-language
-parsing."""
+"""Denial codes returned by the gate in 403/402 error bodies. Lets agents pick the right
+remediation without natural-language parsing."""
 
 
 NextStepsAction = Literal[
-    # Pre-1.9.0
     "poll_for_credential",
     "contact_support",
     "retry",
@@ -312,7 +314,6 @@ NextStepsAction = Literal[
     "regenerate_payment_credential",
     "none",
     "done",
-    # Added in 1.9.0
     "send_existing_identity",
     "mint_new_credential",
     "use_operator_token",
@@ -327,7 +328,7 @@ class AgentMemoryIdentityPaths(TypedDict):
 
 
 class AgentMemoryHint(TypedDict):
-    """Structured hint emitted on bootstrap denials and POST /v1/sessions success (TEC-227).
+    """Structured hint emitted on bootstrap denials and POST /v1/sessions success.
 
     LLM-hosted agents should save this to their long-term memory so future AgentScore encounters
     skip the cold-start session flow. Contents are the pattern, not secrets —
@@ -363,7 +364,7 @@ class _WalletSignerMismatchBodyRequired(TypedDict):
 
 
 class WalletSignerMismatchBody(_WalletSignerMismatchBodyRequired, total=False):
-    """403 body for X-Wallet-Address + mismatched-signer rejections (TEC-226).
+    """403 body for X-Wallet-Address + mismatched-signer rejections.
 
     Returned when the claimed wallet's operator doesn't match the payment signer's operator.
     actual_signer_operator is None if the signer isn't linked to any operator.
@@ -390,7 +391,7 @@ class _WalletAuthRequiresSigningBodyRequired(TypedDict):
 
 
 class WalletAuthRequiresSigningBody(_WalletAuthRequiresSigningBodyRequired, total=False):
-    """403 body for X-Wallet-Address + signer-less rail rejections (TEC-226).
+    """403 body for X-Wallet-Address + signer-less rail rejections.
 
     Returned when X-Wallet-Address is used with a payment rail that has no wallet signer
     (SPT, card). Agent should switch to X-Operator-Token for those rails.

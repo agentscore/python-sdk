@@ -1,4 +1,4 @@
-"""Type-presence checks for types introduced in 1.9.0 (TEC-226/218/227).
+"""Type-presence checks for denial codes, memory hints, and wallet-signer body types.
 
 The real assertion is that the file type-checks under ty; pytest just exercises
 the runtime shape so CI has something to run.
