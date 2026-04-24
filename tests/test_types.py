@@ -25,7 +25,6 @@ def test_denial_code_includes_new_values() -> None:
     assert "wallet_signer_mismatch" in codes
     assert "wallet_auth_requires_wallet_signing" in codes
     assert "token_expired" in codes
-    assert "token_revoked" in codes
     # Backward-compat: pre-1.9.0 codes still present.
     assert "operator_verification_required" in codes
     assert "compliance_denied" in codes

@@ -351,9 +351,10 @@ DenialCode = Literal[
     # as the payment signer; wallet-auth is rejected on rails with no wallet signer.
     "wallet_signer_mismatch",
     "wallet_auth_requires_wallet_signing",
-    # Granular credential-state denials so agents know whether to retry, rotate, or re-KYC.
+    # Credential is no longer valid (revoked or past its TTL — the two cases share this
+    # code deliberately so the API doesn't leak which one). The 401 body carries an
+    # auto-minted session so agents recover without holding an API key.
     "token_expired",
-    "token_revoked",
 ]
 """Denial codes returned by the gate in 403/402 error bodies. Lets agents pick the right
 remediation without natural-language parsing."""
