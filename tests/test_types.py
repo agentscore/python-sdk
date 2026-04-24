@@ -33,7 +33,16 @@ def test_denial_code_includes_new_values() -> None:
 
 def test_next_steps_action_includes_new_values() -> None:
     actions = get_args(NextStepsAction)
-    assert "send_existing_identity" in actions
+    # Probe strategy (gate-emitted missing_identity).
+    assert "probe_identity_then_session" in actions
+    assert "resign_or_switch_to_operator_token" in actions
+    assert "switch_to_operator_token" in actions
+    assert "deliver_verify_url_and_poll" in actions
+    # Session poll states.
+    assert "continue_polling" in actions
+    assert "retry_merchant_request_with_operator_token" in actions
+    assert "use_stored_operator_token" in actions
+    # Backward-compat: pre-1.9.0 actions still present.
     assert "mint_new_credential" in actions
     assert "use_operator_token" in actions
     assert "regenerate_payment_from_linked_wallet" in actions
