@@ -457,9 +457,7 @@ class _WalletAuthRequiresSigningNextStepsRequired(TypedDict):
     action: NextStepsAction
 
 
-class WalletAuthRequiresSigningNextSteps(
-    _WalletAuthRequiresSigningNextStepsRequired, total=False
-):
+class WalletAuthRequiresSigningNextSteps(_WalletAuthRequiresSigningNextStepsRequired, total=False):
     user_message: str
     signer_capable_rails: list[str]
     learn_more_url: str
