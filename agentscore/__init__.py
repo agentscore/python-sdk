@@ -3,10 +3,12 @@ from importlib.metadata import version as _pkg_version
 from agentscore.client import AgentScore
 from agentscore.errors import AgentScoreError
 from agentscore.types import (
+    AccountVerification,
     AgentMemoryHint,
     AgentMemoryIdentityPaths,
     AssessResponse,
     AssociateWalletResponse,
+    CredentialCreateErrorResponse,
     CredentialCreateResponse,
     CredentialItem,
     CredentialListResponse,
@@ -32,12 +34,14 @@ from agentscore.types import (
 __version__ = _pkg_version("agentscore-py")
 
 __all__ = [
+    "AccountVerification",
     "AgentMemoryHint",
     "AgentMemoryIdentityPaths",
     "AgentScore",
     "AgentScoreError",
     "AssessResponse",
     "AssociateWalletResponse",
+    "CredentialCreateErrorResponse",
     "CredentialCreateResponse",
     "CredentialItem",
     "CredentialListResponse",

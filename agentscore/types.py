@@ -172,7 +172,7 @@ class DecisionPolicy(TypedDict, total=False):
 class _AssessResponseRequired(TypedDict):
     decision: str | None
     decision_reasons: list[str]
-    identity_method: str
+    identity_method: Literal["wallet", "operator_token"]
     on_the_fly: bool
     updated_at: str | None
 
@@ -278,14 +278,42 @@ class CredentialCreateResponse(_CredentialCreateResponseRequired, total=False):
     agent_memory: AgentMemoryHint
 
 
+class AccountVerification(TypedDict, total=False):
+    """Account-level KYC state surfaced by GET /v1/credentials (same shape the API emits)."""
+
+    kyc_status: str
+    kyc_verified_at: str | None
+    jurisdiction: str | None
+    age_verified: bool
+    age_bracket: str | None
+    sanctions_status: str | None
+    operator_type: str | None
+
+
 class CredentialListResponse(TypedDict):
     credentials: list[CredentialItem]
-    account_verification: NotRequired[dict]
+    account_verification: NotRequired[AccountVerification]
 
 
 class CredentialRevokeResponse(TypedDict):
     id: str
     revoked: Literal[True]
+
+
+class _CredentialCreateErrorNextSteps(TypedDict):
+    action: NextStepsAction
+
+
+class CredentialCreateErrorNextSteps(_CredentialCreateErrorNextSteps, total=False):
+    user_message: str
+
+
+class CredentialCreateErrorResponse(TypedDict):
+    """409 response body when POST /v1/credentials is called before KYC completes."""
+
+    error: dict  # {"code": "kyc_required", "message": str}
+    verify_url: str
+    next_steps: CredentialCreateErrorNextSteps
 
 
 Network = Literal["evm", "solana"]
@@ -298,6 +326,10 @@ class AssociateWalletResponse(TypedDict):
     associated: bool
     first_seen: bool
     deduped: NotRequired[bool]
+    # Cross-merchant pattern hint. Emitted only on the first wallet capture (first_seen=True)
+    # so merchants can relay it once in a 402 body and LLM-hosted agents persist the pattern
+    # to long-term memory. Absent on all subsequent captures.
+    agent_memory: NotRequired[AgentMemoryHint]
 
 
 # ---------------------------------------------------------------------------
