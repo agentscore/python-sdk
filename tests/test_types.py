@@ -42,7 +42,6 @@ def test_next_steps_action_includes_new_values() -> None:
     assert "retry_merchant_request_with_operator_token" in actions
     assert "use_stored_operator_token" in actions
     # Backward-compat: pre-1.9.0 actions still present.
-    assert "mint_new_credential" in actions
     assert "use_operator_token" in actions
     assert "regenerate_payment_from_linked_wallet" in actions
 

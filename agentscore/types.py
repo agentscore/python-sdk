@@ -368,7 +368,6 @@ NextStepsAction = Literal[
     "regenerate_payment_credential",
     "none",
     "done",
-    "mint_new_credential",
     "use_operator_token",
     "regenerate_payment_from_linked_wallet",
     # Gate-emitted probe strategy — try wallet on signing rails, fall back to stored
