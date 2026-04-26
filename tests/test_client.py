@@ -1346,3 +1346,109 @@ async def test_aassociate_wallet_raises_on_402_payment_required():
     assert exc_info.value.status_code == 402
     assert exc_info.value.code == "payment_required"
     await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# 429 retry-once parity with node-sdk (sync + async)
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_assess_retries_once_on_429_then_succeeds(monkeypatch):
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda _: None)
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "0"}, json={}),
+            httpx.Response(200, json={"address": ADDRESS, "decision": "allow"}),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(address=ADDRESS)
+    assert route.call_count == 2
+    assert result["decision"] == "allow"
+    client.close()
+
+
+@respx.mock
+def test_assess_raises_when_429_persists_across_retry(monkeypatch):
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda _: None)
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(429, headers={"retry-after": "0"}, json={}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.assess(address=ADDRESS)
+    assert route.call_count == 2
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.code == "rate_limited"
+    client.close()
+
+
+@respx.mock
+def test_assess_uses_default_wait_when_retry_after_missing(monkeypatch):
+    captured: list[float] = []
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda s: captured.append(s))
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, json={}),
+            httpx.Response(200, json={"address": ADDRESS, "decision": "allow"}),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.assess(address=ADDRESS)
+    assert captured == [1.0]
+    client.close()
+
+
+@respx.mock
+def test_assess_caps_retry_wait_at_10_seconds(monkeypatch):
+    captured: list[float] = []
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda s: captured.append(s))
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "9999"}, json={}),
+            httpx.Response(200, json={"address": ADDRESS, "decision": "allow"}),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    client.assess(address=ADDRESS)
+    assert captured == [10.0]
+    client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_retries_once_on_429_then_succeeds(monkeypatch):
+    async def _no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("agentscore.client.asyncio.sleep", _no_sleep)
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "0"}, json={}),
+            httpx.Response(200, json={"address": ADDRESS, "decision": "allow"}),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.aassess(address=ADDRESS)
+    assert route.call_count == 2
+    assert result["decision"] == "allow"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_raises_when_429_persists_across_retry(monkeypatch):
+    async def _no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("agentscore.client.asyncio.sleep", _no_sleep)
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(429, headers={"retry-after": "0"}, json={}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        await client.aassess(address=ADDRESS)
+    assert route.call_count == 2
+    assert exc_info.value.status_code == 429
+    await client.aclose()
