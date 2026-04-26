@@ -2,6 +2,7 @@ from importlib.metadata import version as _pkg_version
 
 from agentscore.client import AgentScore
 from agentscore.errors import AgentScoreError
+from agentscore.test_mode import AGENTSCORE_TEST_ADDRESSES, is_agentscore_test_address
 from agentscore.types import (
     AccountVerification,
     AgentMemoryHint,
@@ -35,6 +36,7 @@ from agentscore.webhooks import VerifyWebhookSignatureResult, verify_webhook_sig
 __version__ = _pkg_version("agentscore-py")
 
 __all__ = [
+    "AGENTSCORE_TEST_ADDRESSES",
     "AccountVerification",
     "AgentMemoryHint",
     "AgentMemoryIdentityPaths",
@@ -65,5 +67,6 @@ __all__ = [
     "WalletAuthRequiresSigningBody",
     "WalletSignerMismatchBody",
     "__version__",
+    "is_agentscore_test_address",
     "verify_webhook_signature",
 ]
