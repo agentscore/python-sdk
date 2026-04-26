@@ -23,14 +23,17 @@ class VerifyWebhookSignatureResult:
     """Result of :func:`verify_webhook_signature`."""
 
     valid: bool
-    reason: Literal[
-        "no_signatures",
-        "no_timestamp",
-        "timestamp_too_old",
-        "timestamp_in_future",
-        "signature_mismatch",
-        "malformed_header",
-    ] | None = None
+    reason: (
+        Literal[
+            "no_signatures",
+            "no_timestamp",
+            "timestamp_too_old",
+            "timestamp_in_future",
+            "signature_mismatch",
+            "malformed_header",
+        ]
+        | None
+    ) = None
 
 
 def verify_webhook_signature(
@@ -104,9 +107,7 @@ def verify_webhook_signature(
         return VerifyWebhookSignatureResult(valid=False, reason="no_signatures")
 
     payload_bytes = payload.encode("utf-8") if isinstance(payload, str) else payload
-    signed_payload = (
-        f"{timestamp_str}.".encode() + payload_bytes if timestamp_str else payload_bytes
-    )
+    signed_payload = f"{timestamp_str}.".encode() + payload_bytes if timestamp_str else payload_bytes
 
     expected_hex = hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()
     expected_bytes = bytes.fromhex(expected_hex)
