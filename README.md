@@ -91,6 +91,24 @@ client.associate_wallet(
 )
 ```
 
+### Verify webhook signatures
+
+For merchants who receive HMAC-signed webhooks (Stripe-pattern `t=<unix>,v1=<hex>` header):
+
+```python
+from agentscore import verify_webhook_signature
+
+result = verify_webhook_signature(
+    payload=raw_request_body,            # raw bytes — capture before any JSON parse
+    signature_header=request.headers.get("X-AgentScore-Signature", ""),
+    secret=os.environ["AGENTSCORE_WEBHOOK_SECRET"],
+)
+if not result.valid:
+    return {"error": result.reason}, 400
+```
+
+`reason` distinguishes transient (`timestamp_too_old`, `timestamp_in_future`) from permanent (`signature_mismatch`, `no_signatures`, `malformed_header`) failures. Default tolerance 300s; pass `tolerance_seconds=0` to skip timestamp checking. Uses `hmac.compare_digest` for constant-time comparison.
+
 ### Async
 
 All methods have async variants prefixed with `a`:
@@ -128,6 +146,8 @@ with AgentScore(api_key="as_live_...") as client:
 | `base_url`    | `https://api.agentscore.sh` | API base URL             |
 | `timeout`     | `10.0`                      | Request timeout (seconds)|
 | `user_agent`  | `None`                      | Prepended to the default `User-Agent` as `"{user_agent} (agentscore-py/{version})"`. Use to attribute API calls to your app. |
+
+`AgentScoreError.status` is a property aliasing `.status_code` so polyglot codebases can use the same attribute name regardless of which SDK raised the error.
 
 ## Error Handling
 
