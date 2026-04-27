@@ -62,6 +62,11 @@ print(session["next_steps"]["action"])  # "deliver_verify_url_and_poll"
 status = client.poll_session(session["session_id"], session["poll_secret"])
 if status["status"] == "verified":
     print(status["operator_token"])  # "opc_..." — use for future requests
+
+# Optional pre-association: attach the session to a known wallet or refresh KYC
+# for an existing operator credential.
+client.create_session(address="0x...")
+client.create_session(operator_token="opc_...")  # KYC refresh
 ```
 
 ### Wallet resolution
@@ -140,6 +145,18 @@ try:
     rep = client.get_reputation("0xinvalid")
 except AgentScoreError as e:
     print(e.code, e.status_code, str(e))
+```
+
+`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing:
+
+```python
+try:
+    client.assess("0xabc...", policy={"require_kyc": True})
+except AgentScoreError as e:
+    if e.code == "wallet_signer_mismatch":
+        print("Re-sign from one of:", e.details.get("linked_wallets"))
+    elif e.code == "token_expired":
+        print("Verify at:", e.details.get("verify_url"))
 ```
 
 ## Documentation
