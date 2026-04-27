@@ -31,7 +31,6 @@ from agentscore.types import (
     WalletAuthRequiresSigningBody,
     WalletSignerMismatchBody,
 )
-from agentscore.webhooks import VerifyWebhookSignatureResult, verify_webhook_signature
 
 __version__ = _pkg_version("agentscore-py")
 
@@ -63,10 +62,8 @@ __all__ = [
     "SessionCreateResponse",
     "SessionPollResponse",
     "VerificationLevel",
-    "VerifyWebhookSignatureResult",
     "WalletAuthRequiresSigningBody",
     "WalletSignerMismatchBody",
     "__version__",
     "is_agentscore_test_address",
-    "verify_webhook_signature",
 ]
