@@ -25,7 +25,7 @@ def test_denial_code_includes_new_values() -> None:
     assert "wallet_signer_mismatch" in codes
     assert "wallet_auth_requires_wallet_signing" in codes
     assert "token_expired" in codes
-    # Backward-compat: pre-1.9.0 codes still present.
+    # Backward-compat: prior codes still present.
     assert "operator_verification_required" in codes
     assert "compliance_denied" in codes
 
@@ -41,7 +41,7 @@ def test_next_steps_action_includes_new_values() -> None:
     assert "continue_polling" in actions
     assert "retry_merchant_request_with_operator_token" in actions
     assert "use_stored_operator_token" in actions
-    # Backward-compat: pre-1.9.0 actions still present.
+    # Backward-compat: prior actions still present.
     assert "use_operator_token" in actions
     assert "regenerate_payment_from_linked_wallet" in actions
 

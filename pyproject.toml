@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentscore-py"
-version = "1.9.0"
+version = "2.0.0"
 description = "Python client for the AgentScore trust and reputation API"
 readme = "README.md"
 license = "MIT"
