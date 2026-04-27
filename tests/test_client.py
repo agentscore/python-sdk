@@ -801,6 +801,57 @@ def test_create_session_raises_on_error():
     assert exc_info.value.code == "bad_request"
 
 
+@respx.mock
+def test_create_session_forwards_address_and_operator_token():
+    """Pre-association lets a session refresh KYC for an existing identity."""
+    route = respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.create_session(address="0xabc", operator_token="opc_xyz")
+    body = json.loads(route.calls.last.request.content)
+    assert body["address"] == "0xabc"
+    assert body["operator_token"] == "opc_xyz"
+
+
+@respx.mock
+def test_error_response_populates_details_with_non_error_fields():
+    """Non-`error` response-body keys flow into AgentScoreError.details so consumers
+    can branch on verify_url, linked_wallets, claimed_operator, etc. for granular recovery."""
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            403,
+            json={
+                "error": {"code": "wallet_signer_mismatch", "message": "Signer mismatch"},
+                "claimed_operator": "op_abc",
+                "actual_signer": "0xdef",
+                "linked_wallets": ["0xabc", "0xdef"],
+            },
+        )
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.assess(address="0xabc")
+    err = exc_info.value
+    assert err.code == "wallet_signer_mismatch"
+    assert err.details["claimed_operator"] == "op_abc"
+    assert err.details["actual_signer"] == "0xdef"
+    assert err.details["linked_wallets"] == ["0xabc", "0xdef"]
+    assert "error" not in err.details  # the `error` key is parsed into code/message, not echoed
+
+
+@respx.mock
+def test_error_response_with_no_extra_fields_yields_empty_details():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            500,
+            json={"error": {"code": "internal_error", "message": "Boom"}},
+        )
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.assess(address="0xabc")
+    assert exc_info.value.details == {}
+
+
 # ---------------------------------------------------------------------------
 # poll_session
 # ---------------------------------------------------------------------------
@@ -1044,6 +1095,18 @@ async def test_acreate_session_with_first_class_fields():
     body = json.loads(route.calls.last.request.content)
     assert body["context"] == "wine purchase verification"
     assert body["product_name"] == "Cabernet Reserve 2022"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_acreate_session_forwards_address_and_operator_token():
+    route = respx.post(f"{BASE_URL}/v1/sessions").mock(return_value=httpx.Response(200, json=SESSION_CREATE_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.acreate_session(address="0xabc", operator_token="opc_xyz")
+    body = json.loads(route.calls.last.request.content)
+    assert body["address"] == "0xabc"
+    assert body["operator_token"] == "opc_xyz"
     await client.aclose()
 
 

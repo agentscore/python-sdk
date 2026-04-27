@@ -34,3 +34,23 @@ def test_unknown_error_code():
     err = AgentScoreError(code="unknown_error", message="Something went wrong", status_code=500)
     assert err.code == "unknown_error"
     assert err.status_code == 500
+
+
+def test_details_defaults_to_empty_dict_when_omitted():
+    err = AgentScoreError(code="not_found", message="Not found", status_code=404)
+    assert err.details == {}
+
+
+def test_details_preserves_response_body_fields_for_granular_recovery():
+    err = AgentScoreError(
+        code="wallet_signer_mismatch",
+        message="Signer mismatch",
+        status_code=403,
+        details={
+            "claimed_operator": "op_abc",
+            "actual_signer": "0xdef",
+            "linked_wallets": ["0xabc", "0xdef"],
+        },
+    )
+    assert err.details["claimed_operator"] == "op_abc"
+    assert err.details["linked_wallets"] == ["0xabc", "0xdef"]

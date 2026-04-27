@@ -113,11 +113,16 @@ class AgentScore:
         if response.status_code >= 400:
             try:
                 body = response.json()
-                error = body.get("error", {})
+                error = body.get("error", {}) if isinstance(body, dict) else {}
+                # Preserve everything except the parsed `error` block so consumers
+                # can read verify_url, linked_wallets, reasons, etc. for granular
+                # denial recovery — mirrors node-sdk's AgentScoreError.details.
+                details = {k: v for k, v in body.items() if k != "error"} if isinstance(body, dict) else {}
                 raise AgentScoreError(
                     code=error.get("code", "unknown_error"),
                     message=error.get("message", response.text),
                     status_code=response.status_code,
+                    details=details,
                 )
             except ValueError as err:
                 raise AgentScoreError(
@@ -171,13 +176,24 @@ class AgentScore:
         self,
         context: str | None = None,
         product_name: str | None = None,
+        address: str | None = None,
+        operator_token: str | None = None,
     ) -> SessionCreateResponse:
-        """Create an assessment session for deferred scoring."""
+        """Create an assessment session for deferred scoring.
+
+        ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
+        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
+        e.g. refresh KYC for a credential.
+        """
         body: dict[str, Any] = {}
         if context is not None:
             body["context"] = context
         if product_name is not None:
             body["product_name"] = product_name
+        if address is not None:
+            body["address"] = address
+        if operator_token is not None:
+            body["operator_token"] = operator_token
         client = self._get_sync_client()
         return self._send_sync(lambda: client.post("/v1/sessions", json=body))
 
@@ -286,13 +302,24 @@ class AgentScore:
         self,
         context: str | None = None,
         product_name: str | None = None,
+        address: str | None = None,
+        operator_token: str | None = None,
     ) -> SessionCreateResponse:
-        """Create an assessment session for deferred scoring."""
+        """Create an assessment session for deferred scoring.
+
+        ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
+        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
+        e.g. refresh KYC for a credential.
+        """
         body: dict[str, Any] = {}
         if context is not None:
             body["context"] = context
         if product_name is not None:
             body["product_name"] = product_name
+        if address is not None:
+            body["address"] = address
+        if operator_token is not None:
+            body["operator_token"] = operator_token
         client = self._get_async_client()
         return await self._send_async(lambda: client.post("/v1/sessions", json=body))
 
