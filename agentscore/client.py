@@ -116,7 +116,7 @@ class AgentScore:
                 error = body.get("error", {}) if isinstance(body, dict) else {}
                 # Preserve everything except the parsed `error` block so consumers
                 # can read verify_url, linked_wallets, reasons, etc. for granular
-                # denial recovery — mirrors node-sdk's AgentScoreError.details.
+                # denial recovery — exposed via AgentScoreError.details.
                 details = {k: v for k, v in body.items() if k != "error"} if isinstance(body, dict) else {}
                 raise AgentScoreError(
                     code=error.get("code", "unknown_error"),
@@ -253,8 +253,8 @@ class AgentScore:
             "wallet_address": wallet_address,
             "network": network,
         }
-        # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
-        # node-sdk's behavior of only forwarding when the key actually has content.
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key —
+        # only forward when the key actually has content.
         if idempotency_key:
             if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
                 logger.warning(
@@ -370,8 +370,8 @@ class AgentScore:
             "wallet_address": wallet_address,
             "network": network,
         }
-        # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
-        # node-sdk's behavior of only forwarding when the key actually has content.
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key —
+        # only forward when the key actually has content.
         if idempotency_key:
             if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
                 logger.warning(
