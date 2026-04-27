@@ -48,6 +48,7 @@ dev = [
     "respx>=0.22.0",
     "pytest-asyncio>=1.2.0",
     "python-dotenv>=1.2.1",
+    "lefthook>=2.1.6",
 ]
 
 [tool.ty.src]

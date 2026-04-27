@@ -39,6 +39,7 @@ Single-package Python library published to PyPI.
 
 ```bash
 uv sync --all-extras
+uv run lefthook install   # one-time per clone — wires pre-commit + pre-push
 uv run ruff check .
 uv run ruff format .
 uv run ty check agentscore/
