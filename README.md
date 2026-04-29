@@ -52,16 +52,26 @@ print(result["decision"])  # "allow" | "deny"
 
 ### Verification Sessions
 
-Bootstrap identity for first-time agents:
+Bootstrap identity for first-time agents. The success body carries structured `next_steps` (with `action: "deliver_verify_url_and_poll"`) and a cross-merchant `agent_memory` hint. Poll responses carry `next_steps.action` from the typed `NextStepsAction` Literal (`continue_polling`, `retry_merchant_request_with_operator_token`, `use_stored_operator_token`, `create_new_session`, `verification_failed`, `contact_support`).
 
 ```python
 session = client.create_session()
 print(session["verify_url"], session["poll_url"], session["poll_secret"])
+print(session["next_steps"]["action"])  # "deliver_verify_url_and_poll"
 
 status = client.poll_session(session["session_id"], session["poll_secret"])
 if status["status"] == "verified":
     print(status["operator_token"])  # "opc_..." — use for future requests
+
+# Optional pre-association: attach the session to a known wallet or refresh KYC
+# for an existing operator credential.
+client.create_session(address="0x...")
+client.create_session(operator_token="opc_...")  # KYC refresh
 ```
+
+### Wallet resolution
+
+`assess()` responses include `resolved_operator` and `linked_wallets` — all same-operator sibling wallets (claimed via SIWE or captured via prior `associate_wallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `get_reputation()` accepts either format — network is auto-detected from the address shape.
 
 ### Credential Management
 
@@ -124,6 +134,8 @@ with AgentScore(api_key="as_live_...") as client:
 | `timeout`     | `10.0`                      | Request timeout (seconds)|
 | `user_agent`  | `None`                      | Prepended to the default `User-Agent` as `"{user_agent} (agentscore-py/{version})"`. Use to attribute API calls to your app. |
 
+`AgentScoreError.status` is a property aliasing `.status_code` so polyglot codebases can use the same attribute name regardless of which SDK raised the error.
+
 ## Error Handling
 
 ```python
@@ -133,6 +145,18 @@ try:
     rep = client.get_reputation("0xinvalid")
 except AgentScoreError as e:
     print(e.code, e.status_code, str(e))
+```
+
+`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing:
+
+```python
+try:
+    client.assess("0xabc...", policy={"require_kyc": True})
+except AgentScoreError as e:
+    if e.code == "wallet_signer_mismatch":
+        print("Re-sign from one of:", e.details.get("linked_wallets"))
+    elif e.code == "token_expired":
+        print("Verify at:", e.details.get("verify_url"))
 ```
 
 ## Documentation

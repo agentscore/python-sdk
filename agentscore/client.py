@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from importlib.metadata import version as _pkg_version
 from typing import TYPE_CHECKING, Any
 
@@ -10,16 +12,27 @@ from agentscore.errors import AgentScoreError
 
 logger = logging.getLogger("agentscore")
 
-# Server truncates idempotency_key at 200 chars; warn the caller past that so two
-# distinct payments that share the first 200 chars don't silently dedup.
 _IDEMPOTENCY_KEY_MAX = 200
+_MAX_RETRY_WAIT_SECONDS = 10.0
+
+
+def _retry_after_seconds(response: httpx.Response) -> float:
+    raw = response.headers.get("retry-after", "1")
+    try:
+        return min(float(raw), _MAX_RETRY_WAIT_SECONDS)
+    except (TypeError, ValueError):
+        return 1.0
+
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
     from agentscore.types import (
         AssessResponse,
         AssociateWalletResponse,
         CredentialCreateResponse,
         CredentialListResponse,
+        CredentialRevokeResponse,
         DecisionPolicy,
         Network,
         ReputationResponse,
@@ -73,6 +86,22 @@ class AgentScore:
             )
         return self._async_client
 
+    def _send_sync(self, send_fn: Callable[[], httpx.Response]) -> Any:
+        """Issue a request, retry once on 429 honoring retry-after, then parse."""
+        response = send_fn()
+        if response.status_code == 429:
+            time.sleep(_retry_after_seconds(response))
+            response = send_fn()
+        return self._handle_response(response)
+
+    async def _send_async(self, send_fn: Callable[[], Awaitable[httpx.Response]]) -> Any:
+        """Async variant of :meth:`_send_sync`."""
+        response = await send_fn()
+        if response.status_code == 429:
+            await asyncio.sleep(_retry_after_seconds(response))
+            response = await send_fn()
+        return self._handle_response(response)
+
     def _handle_response(self, response: httpx.Response) -> Any:
         if response.status_code == 429:
             retry_after = response.headers.get("retry-after", "1")
@@ -84,11 +113,16 @@ class AgentScore:
         if response.status_code >= 400:
             try:
                 body = response.json()
-                error = body.get("error", {})
+                error = body.get("error", {}) if isinstance(body, dict) else {}
+                # Preserve everything except the parsed `error` block so consumers
+                # can read verify_url, linked_wallets, reasons, etc. for granular
+                # denial recovery — exposed via AgentScoreError.details.
+                details = {k: v for k, v in body.items() if k != "error"} if isinstance(body, dict) else {}
                 raise AgentScoreError(
                     code=error.get("code", "unknown_error"),
                     message=error.get("message", response.text),
                     status_code=response.status_code,
+                    details=details,
                 )
             except ValueError as err:
                 raise AgentScoreError(
@@ -113,8 +147,7 @@ class AgentScore:
         if chain:
             params["chain"] = chain
         client = self._get_sync_client()
-        response = client.get(f"/v1/reputation/{address}", params=params)
-        return self._handle_response(response)
+        return self._send_sync(lambda: client.get(f"/v1/reputation/{address}", params=params))
 
     def assess(
         self,
@@ -137,32 +170,42 @@ class AgentScore:
         if policy is not None:
             body["policy"] = dict(policy)
         client = self._get_sync_client()
-        response = client.post("/v1/assess", json=body)
-        return self._handle_response(response)
+        return self._send_sync(lambda: client.post("/v1/assess", json=body))
 
     def create_session(
         self,
         context: str | None = None,
         product_name: str | None = None,
+        address: str | None = None,
+        operator_token: str | None = None,
     ) -> SessionCreateResponse:
-        """Create an assessment session for deferred scoring."""
+        """Create an assessment session for deferred scoring.
+
+        ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
+        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
+        e.g. refresh KYC for a credential.
+        """
         body: dict[str, Any] = {}
         if context is not None:
             body["context"] = context
         if product_name is not None:
             body["product_name"] = product_name
+        if address is not None:
+            body["address"] = address
+        if operator_token is not None:
+            body["operator_token"] = operator_token
         client = self._get_sync_client()
-        response = client.post("/v1/sessions", json=body)
-        return self._handle_response(response)
+        return self._send_sync(lambda: client.post("/v1/sessions", json=body))
 
     def poll_session(self, session_id: str, poll_secret: str) -> SessionPollResponse:
         """Poll a session for its current status and result."""
         client = self._get_sync_client()
-        response = client.get(
-            f"/v1/sessions/{session_id}",
-            headers={"X-Poll-Secret": poll_secret},
+        return self._send_sync(
+            lambda: client.get(
+                f"/v1/sessions/{session_id}",
+                headers={"X-Poll-Secret": poll_secret},
+            ),
         )
-        return self._handle_response(response)
 
     def create_credential(
         self,
@@ -176,20 +219,17 @@ class AgentScore:
         if ttl_days is not None:
             body["ttl_days"] = ttl_days
         client = self._get_sync_client()
-        response = client.post("/v1/credentials", json=body)
-        return self._handle_response(response)
+        return self._send_sync(lambda: client.post("/v1/credentials", json=body))
 
     def list_credentials(self) -> CredentialListResponse:
         """List all API credentials."""
         client = self._get_sync_client()
-        response = client.get("/v1/credentials")
-        return self._handle_response(response)
+        return self._send_sync(lambda: client.get("/v1/credentials"))
 
-    def revoke_credential(self, id: str) -> dict:
+    def revoke_credential(self, id: str) -> CredentialRevokeResponse:
         """Revoke an API credential by ID."""
         client = self._get_sync_client()
-        response = client.delete(f"/v1/credentials/{id}")
-        return self._handle_response(response)
+        return self._send_sync(lambda: client.delete(f"/v1/credentials/{id}"))
 
     def associate_wallet(
         self,
@@ -213,8 +253,8 @@ class AgentScore:
             "wallet_address": wallet_address,
             "network": network,
         }
-        # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
-        # node-sdk's behavior of only forwarding when the key actually has content.
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key —
+        # only forward when the key actually has content.
         if idempotency_key:
             if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
                 logger.warning(
@@ -223,8 +263,7 @@ class AgentScore:
                 )
             body["idempotency_key"] = idempotency_key
         client = self._get_sync_client()
-        response = client.post("/v1/credentials/wallets", json=body)
-        return self._handle_response(response)
+        return self._send_sync(lambda: client.post("/v1/credentials/wallets", json=body))
 
     # --- Async methods ---
 
@@ -234,8 +273,7 @@ class AgentScore:
         if chain:
             params["chain"] = chain
         client = self._get_async_client()
-        response = await client.get(f"/v1/reputation/{address}", params=params)
-        return self._handle_response(response)
+        return await self._send_async(lambda: client.get(f"/v1/reputation/{address}", params=params))
 
     async def aassess(
         self,
@@ -258,32 +296,42 @@ class AgentScore:
         if policy is not None:
             body["policy"] = dict(policy)
         client = self._get_async_client()
-        response = await client.post("/v1/assess", json=body)
-        return self._handle_response(response)
+        return await self._send_async(lambda: client.post("/v1/assess", json=body))
 
     async def acreate_session(
         self,
         context: str | None = None,
         product_name: str | None = None,
+        address: str | None = None,
+        operator_token: str | None = None,
     ) -> SessionCreateResponse:
-        """Create an assessment session for deferred scoring."""
+        """Create an assessment session for deferred scoring.
+
+        ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
+        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
+        e.g. refresh KYC for a credential.
+        """
         body: dict[str, Any] = {}
         if context is not None:
             body["context"] = context
         if product_name is not None:
             body["product_name"] = product_name
+        if address is not None:
+            body["address"] = address
+        if operator_token is not None:
+            body["operator_token"] = operator_token
         client = self._get_async_client()
-        response = await client.post("/v1/sessions", json=body)
-        return self._handle_response(response)
+        return await self._send_async(lambda: client.post("/v1/sessions", json=body))
 
     async def apoll_session(self, session_id: str, poll_secret: str) -> SessionPollResponse:
         """Poll a session for its current status and result."""
         client = self._get_async_client()
-        response = await client.get(
-            f"/v1/sessions/{session_id}",
-            headers={"X-Poll-Secret": poll_secret},
+        return await self._send_async(
+            lambda: client.get(
+                f"/v1/sessions/{session_id}",
+                headers={"X-Poll-Secret": poll_secret},
+            ),
         )
-        return self._handle_response(response)
 
     async def acreate_credential(
         self,
@@ -297,20 +345,17 @@ class AgentScore:
         if ttl_days is not None:
             body["ttl_days"] = ttl_days
         client = self._get_async_client()
-        response = await client.post("/v1/credentials", json=body)
-        return self._handle_response(response)
+        return await self._send_async(lambda: client.post("/v1/credentials", json=body))
 
     async def alist_credentials(self) -> CredentialListResponse:
         """List all API credentials."""
         client = self._get_async_client()
-        response = await client.get("/v1/credentials")
-        return self._handle_response(response)
+        return await self._send_async(lambda: client.get("/v1/credentials"))
 
-    async def arevoke_credential(self, id: str) -> dict:
+    async def arevoke_credential(self, id: str) -> CredentialRevokeResponse:
         """Revoke an API credential by ID."""
         client = self._get_async_client()
-        response = await client.delete(f"/v1/credentials/{id}")
-        return self._handle_response(response)
+        return await self._send_async(lambda: client.delete(f"/v1/credentials/{id}"))
 
     async def aassociate_wallet(
         self,
@@ -325,8 +370,8 @@ class AgentScore:
             "wallet_address": wallet_address,
             "network": network,
         }
-        # Truthy check (not `is not None`) so empty strings don't ship a useless key — mirrors
-        # node-sdk's behavior of only forwarding when the key actually has content.
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key —
+        # only forward when the key actually has content.
         if idempotency_key:
             if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
                 logger.warning(
@@ -335,8 +380,7 @@ class AgentScore:
                 )
             body["idempotency_key"] = idempotency_key
         client = self._get_async_client()
-        response = await client.post("/v1/credentials/wallets", json=body)
-        return self._handle_response(response)
+        return await self._send_async(lambda: client.post("/v1/credentials/wallets", json=body))
 
     def close(self):
         if self._sync_client:

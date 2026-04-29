@@ -2,16 +2,24 @@ from importlib.metadata import version as _pkg_version
 
 from agentscore.client import AgentScore
 from agentscore.errors import AgentScoreError
+from agentscore.test_mode import AGENTSCORE_TEST_ADDRESSES, is_agentscore_test_address
 from agentscore.types import (
+    AccountVerification,
+    AgentMemoryHint,
+    AgentMemoryIdentityPaths,
     AssessResponse,
     AssociateWalletResponse,
+    CredentialCreateErrorResponse,
     CredentialCreateResponse,
     CredentialItem,
     CredentialListResponse,
+    CredentialRevokeResponse,
     DecisionPolicy,
+    DenialCode,
     EntityType,
     Grade,
     Network,
+    NextStepsAction,
     OperatorVerification,
     Reputation,
     ReputationResponse,
@@ -20,22 +28,32 @@ from agentscore.types import (
     SessionCreateResponse,
     SessionPollResponse,
     VerificationLevel,
+    WalletAuthRequiresSigningBody,
+    WalletSignerMismatchBody,
 )
 
 __version__ = _pkg_version("agentscore-py")
 
 __all__ = [
+    "AGENTSCORE_TEST_ADDRESSES",
+    "AccountVerification",
+    "AgentMemoryHint",
+    "AgentMemoryIdentityPaths",
     "AgentScore",
     "AgentScoreError",
     "AssessResponse",
     "AssociateWalletResponse",
+    "CredentialCreateErrorResponse",
     "CredentialCreateResponse",
     "CredentialItem",
     "CredentialListResponse",
+    "CredentialRevokeResponse",
     "DecisionPolicy",
+    "DenialCode",
     "EntityType",
     "Grade",
     "Network",
+    "NextStepsAction",
     "OperatorVerification",
     "Reputation",
     "ReputationResponse",
@@ -44,5 +62,8 @@ __all__ = [
     "SessionCreateResponse",
     "SessionPollResponse",
     "VerificationLevel",
+    "WalletAuthRequiresSigningBody",
+    "WalletSignerMismatchBody",
     "__version__",
+    "is_agentscore_test_address",
 ]

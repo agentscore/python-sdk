@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentscore-py"
-version = "1.8.0"
+version = "2.0.0"
 description = "Python client for the AgentScore trust and reputation API"
 readme = "README.md"
 license = "MIT"
@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://docs.agentscore.sh"
+Homepage = "https://agentscore.sh"
 Repository = "https://github.com/agentscore/python-sdk"
 Issues = "https://github.com/agentscore/python-sdk/issues"
 
@@ -34,7 +34,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=agentscore --cov-report=term-missing --cov-fail-under=94"
+addopts = "--cov=agentscore --cov-report=term-missing --cov-fail-under=95"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agentscore"]
@@ -48,6 +48,7 @@ dev = [
     "respx>=0.22.0",
     "pytest-asyncio>=1.2.0",
     "python-dotenv>=1.2.1",
+    "lefthook>=2.1.6",
 ]
 
 [tool.ty.src]
