@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/agentscore-py.svg)](https://pypi.org/project/agentscore-py/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Python client for the [AgentScore](https://agentscore.sh) trust and reputation API.
+Python client for the [AgentScore](https://agentscore.sh) APIs.
 
 ## Install
 

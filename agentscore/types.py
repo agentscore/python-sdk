@@ -338,23 +338,32 @@ class AssociateWalletResponse(TypedDict):
 
 
 DenialCode = Literal[
-    "operator_verification_required",
-    "compliance_denied",
-    "compliance_error",
-    "wallet_not_trusted",
+    # Gate-emitted codes from commerce middleware (canonical 9-element union)
     "missing_identity",
     "identity_verification_required",
-    "payment_required",
-    "api_error",
-    "kyc_required",
-    # Wallet-signer binding — claimed X-Wallet-Address must resolve to the same operator
-    # as the payment signer; wallet-auth is rejected on rails with no wallet signer.
-    "wallet_signer_mismatch",
-    "wallet_auth_requires_wallet_signing",
     # Credential is no longer valid (revoked or past its TTL — the two cases share this
     # code deliberately so the API doesn't leak which one). The 401 body carries an
     # auto-minted session so agents recover without holding an API key.
     "token_expired",
+    # Credential doesn't exist at all (typo, fabricated, never minted). Permanent state;
+    # no auto-session is issued because the agent may have other valid tokens to try.
+    "invalid_credential",
+    # Wallet-signer binding — claimed X-Wallet-Address must resolve to the same operator
+    # as the payment signer; wallet-auth is rejected on rails with no wallet signer.
+    "wallet_signer_mismatch",
+    "wallet_auth_requires_wallet_signing",
+    "wallet_not_trusted",
+    "api_error",
+    "payment_required",
+    # Merchant-emitted convenience codes (e.g. martin-estate's on_denied wraps gate
+    # denials into wine-specific business codes). Not emitted by the AgentScore API
+    # itself but appear in 4xx bodies the SDK may surface back to callers.
+    "operator_verification_required",
+    "compliance_denied",
+    "compliance_error",
+    # Decision-reason code surfaced in error.code by some merchants — kept for back-compat
+    # with merchants that flatten policy reasons into the error envelope.
+    "kyc_required",
 ]
 """Denial codes returned by the gate in 403/402 error bodies. Lets agents pick the right
 remediation without natural-language parsing."""

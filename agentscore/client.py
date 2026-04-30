@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 
 class AgentScore:
-    """Client for the AgentScore trust and reputation API."""
+    """Client for the AgentScore APIs."""
 
     def __init__(
         self,
@@ -153,7 +153,7 @@ class AgentScore:
         self,
         address: str | None = None,
         chain: str | None = None,
-        refresh: bool = False,
+        refresh: bool | None = None,
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
     ) -> AssessResponse:
@@ -165,8 +165,8 @@ class AgentScore:
             body["operator_token"] = operator_token
         if chain:
             body["chain"] = chain
-        if refresh:
-            body["refresh"] = True
+        if refresh is not None:
+            body["refresh"] = refresh
         if policy is not None:
             body["policy"] = dict(policy)
         client = self._get_sync_client()
@@ -279,7 +279,7 @@ class AgentScore:
         self,
         address: str | None = None,
         chain: str | None = None,
-        refresh: bool = False,
+        refresh: bool | None = None,
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
     ) -> AssessResponse:
@@ -291,8 +291,8 @@ class AgentScore:
             body["operator_token"] = operator_token
         if chain:
             body["chain"] = chain
-        if refresh:
-            body["refresh"] = True
+        if refresh is not None:
+            body["refresh"] = refresh
         if policy is not None:
             body["policy"] = dict(policy)
         client = self._get_async_client()
