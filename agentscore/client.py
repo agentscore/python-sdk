@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 
 class AgentScore:
-    """Client for the AgentScore trust and reputation API."""
+    """Client for the AgentScore APIs."""
 
     def __init__(
         self,

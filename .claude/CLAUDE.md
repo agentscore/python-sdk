@@ -1,6 +1,6 @@
 # agentscore-py
 
-Python client for the AgentScore trust and reputation API.
+Python client for the AgentScore APIs.
 
 ## Identity Model
 
