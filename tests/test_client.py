@@ -515,7 +515,7 @@ REPUTATION_WITH_VERIFICATION = {
 ASSESS_WITH_COMPLIANCE = {
     **ASSESS_PAYLOAD,
     "decision": "deny",
-    "decision_reasons": ["kyc_required", "sanctions_check_pending"],
+    "decision_reasons": ["kyc_required", "sanctions_flagged"],
     "operator_verification": {
         "level": "none",
         "operator_type": None,
@@ -633,7 +633,7 @@ def test_full_compliance_deny_flow():
     compliance_response = {
         **REPUTATION_PAYLOAD,
         "decision": "deny",
-        "decision_reasons": ["kyc_required", "sanctions_check_pending"],
+        "decision_reasons": ["kyc_required", "sanctions_flagged"],
         "on_the_fly": False,
         "operator_verification": {
             "level": "none",
@@ -654,7 +654,7 @@ def test_full_compliance_deny_flow():
     )
     assert result["decision"] == "deny"
     assert "kyc_required" in result["decision_reasons"]
-    assert "sanctions_check_pending" in result["decision_reasons"]
+    assert "sanctions_flagged" in result["decision_reasons"]
     assert result["verify_url"] == "https://agentscore.sh/verify/xyz789"
     assert result["operator_verification"]["level"] == "none"
 
