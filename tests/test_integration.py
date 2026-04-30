@@ -5,10 +5,13 @@ import pytest
 from agentscore import AgentScore
 
 API_KEY = os.environ.get("AGENTSCORE_API_KEY")
-BASE_URL = os.environ.get("AGENTSCORE_BASE_URL", "http://api.dev.agentscore.internal")
+BASE_URL = os.environ.get("AGENTSCORE_BASE_URL")
 TEST_ADDRESS = "0x339559a2d1cd15059365fc7bd36b3047bba480e0"
 
-pytestmark = pytest.mark.skipif(not API_KEY, reason="AGENTSCORE_API_KEY not set")
+pytestmark = pytest.mark.skipif(
+    not (API_KEY and BASE_URL),
+    reason="AGENTSCORE_API_KEY and AGENTSCORE_BASE_URL must both be set",
+)
 
 
 def test_get_reputation_shape():
