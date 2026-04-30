@@ -407,10 +407,22 @@ def test_user_agent_header_prepends_custom_user_agent():
 
 
 @respx.mock
-def test_assess_refresh_false_not_included_in_body():
+def test_assess_refresh_explicit_false_sent_in_body():
+    # Matches node-sdk semantics: when consumer explicitly passes refresh=False,
+    # the SDK includes `refresh: false` in the body. Default (no value passed)
+    # omits the field entirely.
     route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
     client.assess(ADDRESS, refresh=False)
+    body = json.loads(route.calls.last.request.content)
+    assert body.get("refresh") is False
+
+
+@respx.mock
+def test_assess_refresh_omitted_when_default():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS)
     body = json.loads(route.calls.last.request.content)
     assert "refresh" not in body
 
