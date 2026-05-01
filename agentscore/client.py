@@ -8,7 +8,15 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from agentscore.errors import AgentScoreError
+from agentscore.errors import (
+    AgentScoreError,
+    InvalidCredentialError,
+    PaymentRequiredError,
+    QuotaExceededError,
+    RateLimitedError,
+    TimeoutError,
+    TokenExpiredError,
+)
 
 logger = logging.getLogger("agentscore")
 
@@ -22,6 +30,73 @@ def _retry_after_seconds(response: httpx.Response) -> float:
         return min(float(raw), _MAX_RETRY_WAIT_SECONDS)
     except (TypeError, ValueError):
         return 1.0
+
+
+def _extract_quota(response: httpx.Response) -> dict[str, Any] | None:
+    """Parse ``X-Quota-Limit``, ``X-Quota-Used``, ``X-Quota-Reset`` from response headers.
+
+    Returns ``None`` when none of the three are present (Enterprise / unlimited tiers).
+    Numeric fields fall back to ``None`` if the header is malformed; reset stays as a
+    string ('never' or ISO-8601 timestamp).
+    """
+    headers = response.headers
+    if not hasattr(headers, "get"):
+        return None
+    limit = headers.get("x-quota-limit")
+    used = headers.get("x-quota-used")
+    reset = headers.get("x-quota-reset")
+    if limit is None and used is None and reset is None:
+        return None
+    return {"limit": _parse_quota_number(limit), "used": _parse_quota_number(used), "reset": reset}
+
+
+def _parse_quota_number(raw: str | None) -> int | None:
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_error_from_response(response: httpx.Response) -> AgentScoreError:
+    """Map a non-2xx ``httpx.Response`` to the right typed :class:`AgentScoreError` subclass.
+
+    Reads the body to extract ``error.code`` for discrimination + the rest for ``details``.
+    Falls through to a generic :class:`AgentScoreError` for codes the SDK doesn't have a
+    dedicated subclass for.
+    """
+    code = "unknown_error"
+    message = response.text
+    details: dict[str, Any] = {}
+
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            error = body.get("error", {})
+            if isinstance(error, dict):
+                code = error.get("code", code)
+                message = error.get("message", message)
+            # Preserve everything except the parsed `error` block so consumers can read
+            # verify_url, linked_wallets, reasons, etc. for granular denial recovery.
+            details = {k: v for k, v in body.items() if k != "error"}
+    except ValueError:
+        # Body wasn't JSON or didn't have the expected shape — keep defaults.
+        pass
+
+    if response.status_code == 402:
+        return PaymentRequiredError(message, details)
+    if response.status_code == 401:
+        if code == "token_expired":
+            return TokenExpiredError(message, details)
+        if code == "invalid_credential":
+            return InvalidCredentialError(message, details)
+    if response.status_code == 429:
+        if code == "quota_exceeded":
+            return QuotaExceededError(message, details)
+        if code == "rate_limited":
+            return RateLimitedError(message, details)
+    return AgentScoreError(code, message, response.status_code, details)
 
 
 if TYPE_CHECKING:
@@ -88,48 +163,69 @@ class AgentScore:
 
     def _send_sync(self, send_fn: Callable[[], httpx.Response]) -> Any:
         """Issue a request, retry once on 429 honoring retry-after, then parse."""
-        response = send_fn()
+        try:
+            response = send_fn()
+        except httpx.TimeoutException as exc:
+            raise TimeoutError(str(exc)) from exc
         if response.status_code == 429:
             time.sleep(_retry_after_seconds(response))
-            response = send_fn()
+            try:
+                response = send_fn()
+            except httpx.TimeoutException as exc:
+                raise TimeoutError(str(exc)) from exc
         return self._handle_response(response)
+
+    def _send_sync_with_response(self, send_fn: Callable[[], httpx.Response]) -> tuple[Any, httpx.Response]:
+        """Issue a request, retry once on 429, then return ``(parsed_body, response)``.
+
+        Variant of :meth:`_send_sync` that exposes the raw ``httpx.Response`` so callers
+        (e.g. :meth:`assess`) can read response headers like ``X-Quota-*``.
+        """
+        try:
+            response = send_fn()
+        except httpx.TimeoutException as exc:
+            raise TimeoutError(str(exc)) from exc
+        if response.status_code == 429:
+            time.sleep(_retry_after_seconds(response))
+            try:
+                response = send_fn()
+            except httpx.TimeoutException as exc:
+                raise TimeoutError(str(exc)) from exc
+        return self._handle_response(response), response
 
     async def _send_async(self, send_fn: Callable[[], Awaitable[httpx.Response]]) -> Any:
         """Async variant of :meth:`_send_sync`."""
-        response = await send_fn()
+        try:
+            response = await send_fn()
+        except httpx.TimeoutException as exc:
+            raise TimeoutError(str(exc)) from exc
         if response.status_code == 429:
             await asyncio.sleep(_retry_after_seconds(response))
-            response = await send_fn()
+            try:
+                response = await send_fn()
+            except httpx.TimeoutException as exc:
+                raise TimeoutError(str(exc)) from exc
         return self._handle_response(response)
 
-    def _handle_response(self, response: httpx.Response) -> Any:
+    async def _send_async_with_response(
+        self, send_fn: Callable[[], Awaitable[httpx.Response]]
+    ) -> tuple[Any, httpx.Response]:
+        """Async variant of :meth:`_send_sync_with_response`."""
+        try:
+            response = await send_fn()
+        except httpx.TimeoutException as exc:
+            raise TimeoutError(str(exc)) from exc
         if response.status_code == 429:
-            retry_after = response.headers.get("retry-after", "1")
-            raise AgentScoreError(
-                code="rate_limited",
-                message=f"Rate limit exceeded. Retry after {retry_after}s",
-                status_code=429,
-            )
-        if response.status_code >= 400:
+            await asyncio.sleep(_retry_after_seconds(response))
             try:
-                body = response.json()
-                error = body.get("error", {}) if isinstance(body, dict) else {}
-                # Preserve everything except the parsed `error` block so consumers
-                # can read verify_url, linked_wallets, reasons, etc. for granular
-                # denial recovery — exposed via AgentScoreError.details.
-                details = {k: v for k, v in body.items() if k != "error"} if isinstance(body, dict) else {}
-                raise AgentScoreError(
-                    code=error.get("code", "unknown_error"),
-                    message=error.get("message", response.text),
-                    status_code=response.status_code,
-                    details=details,
-                )
-            except ValueError as err:
-                raise AgentScoreError(
-                    code="unknown_error",
-                    message=response.text,
-                    status_code=response.status_code,
-                ) from err
+                response = await send_fn()
+            except httpx.TimeoutException as exc:
+                raise TimeoutError(str(exc)) from exc
+        return self._handle_response(response), response
+
+    def _handle_response(self, response: httpx.Response) -> Any:
+        if response.status_code >= 400:
+            raise _build_error_from_response(response)
         try:
             return response.json()
         except ValueError as err:
@@ -170,7 +266,11 @@ class AgentScore:
         if policy is not None:
             body["policy"] = dict(policy)
         client = self._get_sync_client()
-        return self._send_sync(lambda: client.post("/v1/assess", json=body))
+        data, response = self._send_sync_with_response(lambda: client.post("/v1/assess", json=body))
+        quota = _extract_quota(response)
+        if quota is not None:
+            data["quota"] = quota
+        return data
 
     def create_session(
         self,
@@ -296,7 +396,11 @@ class AgentScore:
         if policy is not None:
             body["policy"] = dict(policy)
         client = self._get_async_client()
-        return await self._send_async(lambda: client.post("/v1/assess", json=body))
+        data, response = await self._send_async_with_response(lambda: client.post("/v1/assess", json=body))
+        quota = _extract_quota(response)
+        if quota is not None:
+            data["quota"] = quota
+        return data
 
     async def acreate_session(
         self,
@@ -381,6 +485,27 @@ class AgentScore:
             body["idempotency_key"] = idempotency_key
         client = self._get_async_client()
         return await self._send_async(lambda: client.post("/v1/credentials/wallets", json=body))
+
+    def telemetry_signer_match(self, payload: dict[str, Any]) -> None:
+        """Fire-and-forget telemetry — report a wallet-signer-match verdict.
+
+        Used internally by the commerce gate's ``verify_wallet_signer_match`` helper to track
+        aggregate signer-binding behavior across merchants. Does not raise; failures are
+        logged at warning level so persistent telemetry outages are visible in ops logs.
+        """
+        try:
+            client = self._get_sync_client()
+            client.post("/v1/telemetry/signer-match", json=payload)
+        except Exception as err:
+            logger.warning("telemetry_signer_match failed: %s", err)
+
+    async def atelemetry_signer_match(self, payload: dict[str, Any]) -> None:
+        """Async variant of :meth:`telemetry_signer_match`."""
+        try:
+            client = self._get_async_client()
+            await client.post("/v1/telemetry/signer-match", json=payload)
+        except Exception as err:
+            logger.warning("atelemetry_signer_match failed: %s", err)
 
     def close(self):
         if self._sync_client:

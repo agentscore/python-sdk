@@ -1,7 +1,15 @@
 from importlib.metadata import version as _pkg_version
 
 from agentscore.client import AgentScore
-from agentscore.errors import AgentScoreError
+from agentscore.errors import (
+    AgentScoreError,
+    InvalidCredentialError,
+    PaymentRequiredError,
+    QuotaExceededError,
+    RateLimitedError,
+    TimeoutError,
+    TokenExpiredError,
+)
 from agentscore.test_mode import AGENTSCORE_TEST_ADDRESSES, is_agentscore_test_address
 from agentscore.types import (
     AccountVerification,
@@ -21,6 +29,7 @@ from agentscore.types import (
     Network,
     NextStepsAction,
     OperatorVerification,
+    QuotaInfo,
     Reputation,
     ReputationResponse,
     ReputationStatus,
@@ -52,15 +61,22 @@ __all__ = [
     "DenialCode",
     "EntityType",
     "Grade",
+    "InvalidCredentialError",
     "Network",
     "NextStepsAction",
     "OperatorVerification",
+    "PaymentRequiredError",
+    "QuotaExceededError",
+    "QuotaInfo",
+    "RateLimitedError",
     "Reputation",
     "ReputationResponse",
     "ReputationStatus",
     "SessionCreateRequest",
     "SessionCreateResponse",
     "SessionPollResponse",
+    "TimeoutError",
+    "TokenExpiredError",
     "VerificationLevel",
     "WalletAuthRequiresSigningBody",
     "WalletSignerMismatchBody",

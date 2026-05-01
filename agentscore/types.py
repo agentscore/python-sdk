@@ -186,6 +186,21 @@ class PolicyExplanation(TypedDict, total=False):
     how_to_remedy: str | None
 
 
+class QuotaInfo(TypedDict):
+    """Per-account assess quota observability, captured from ``X-Quota-*`` response headers.
+
+    Populated on the success path. Numeric fields are ``None`` when the API didn't include
+    the header (Enterprise / unlimited tiers, or when the API is configured without a
+    per-account quota).
+    """
+
+    limit: int | None
+    used: int | None
+    # ``X-Quota-Reset`` is an ISO-8601 timestamp, or the literal string "never" for lifetime
+    # caps. The API emits "never" for tiers without a reset.
+    reset: str | None
+
+
 class AssessResponse(_AssessResponseRequired, total=False):
     operator_verification: OperatorVerification
     resolved_operator: str | None
@@ -196,6 +211,9 @@ class AssessResponse(_AssessResponseRequired, total=False):
     verify_url: str
     policy_result: PolicyResult | None
     explanation: NotRequired[list[PolicyExplanation]]
+    # Quota state for this account, captured from response headers on the success path.
+    # Use to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before 429.
+    quota: NotRequired[QuotaInfo]
 
 
 class SessionCreateRequest(TypedDict, total=False):

@@ -488,10 +488,15 @@ def test_assess_empty_policy_dict_included_in_body():
 
 @respx.mock
 def test_timeout_error_raises_agentscore_error():
+    from agentscore.errors import TimeoutError as AgentScoreTimeoutError
+
     respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(side_effect=httpx.TimeoutException("timed out"))
     client = AgentScore(api_key=API_KEY)
-    with pytest.raises(httpx.TimeoutException):
+    with pytest.raises(AgentScoreTimeoutError) as exc_info:
         client.get_reputation(ADDRESS)
+    # TimeoutError subclasses AgentScoreError so existing `except AgentScoreError` blocks still catch it.
+    assert isinstance(exc_info.value, AgentScoreError)
+    assert exc_info.value.code == "timeout"
 
 
 @respx.mock
@@ -1446,16 +1451,24 @@ def test_assess_retries_once_on_429_then_succeeds(monkeypatch):
 
 @respx.mock
 def test_assess_raises_when_429_persists_across_retry(monkeypatch):
+    from agentscore.errors import RateLimitedError
+
     monkeypatch.setattr("agentscore.client.time.sleep", lambda _: None)
+    # Real API includes the error.code in the 429 body; mock matches that contract.
     route = respx.post(f"{BASE_URL}/v1/assess").mock(
-        return_value=httpx.Response(429, headers={"retry-after": "0"}, json={}),
+        return_value=httpx.Response(
+            429,
+            headers={"retry-after": "0"},
+            json={"error": {"code": "rate_limited", "message": "Rate limit exceeded"}},
+        ),
     )
     client = AgentScore(api_key=API_KEY)
-    with pytest.raises(AgentScoreError) as exc_info:
+    with pytest.raises(RateLimitedError) as exc_info:
         client.assess(address=ADDRESS)
     assert route.call_count == 2
     assert exc_info.value.status_code == 429
     assert exc_info.value.code == "rate_limited"
+    assert isinstance(exc_info.value, AgentScoreError)
     client.close()
 
 
@@ -1526,4 +1539,352 @@ async def test_aassess_raises_when_429_persists_across_retry(monkeypatch):
         await client.aassess(address=ADDRESS)
     assert route.call_count == 2
     assert exc_info.value.status_code == 429
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Typed errors
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_payment_required_error_on_402():
+    from agentscore.errors import PaymentRequiredError
+
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            402,
+            json={"error": {"code": "payment_required", "message": "Endpoint not enabled"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(PaymentRequiredError) as exc_info:
+        client.assess(address=ADDRESS)
+    assert isinstance(exc_info.value, AgentScoreError)
+    assert exc_info.value.status_code == 402
+    assert exc_info.value.code == "payment_required"
+    client.close()
+
+
+@respx.mock
+def test_token_expired_error_exposes_parsed_body_fields():
+    from agentscore.errors import TokenExpiredError
+
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            401,
+            json={
+                "error": {"code": "token_expired", "message": "Operator token expired"},
+                "verify_url": "https://agentscore.sh/verify/abc",
+                "session_id": "sess_123",
+                "poll_secret": "ps_456",
+                "poll_url": "https://api.agentscore.sh/v1/sessions/sess_123",
+                "next_steps": {"action": "deliver_verify_url_and_poll"},
+                "agent_memory": {"pattern_summary": "remembered"},
+            },
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(TokenExpiredError) as exc_info:
+        client.assess(address=ADDRESS)
+    err = exc_info.value
+    assert err.code == "token_expired"
+    assert err.status_code == 401
+    assert err.verify_url == "https://agentscore.sh/verify/abc"
+    assert err.session_id == "sess_123"
+    assert err.poll_secret == "ps_456"
+    assert err.poll_url == "https://api.agentscore.sh/v1/sessions/sess_123"
+    assert err.next_steps == {"action": "deliver_verify_url_and_poll"}
+    assert err.agent_memory == {"pattern_summary": "remembered"}
+    client.close()
+
+
+@respx.mock
+def test_invalid_credential_error_on_401():
+    from agentscore.errors import InvalidCredentialError
+
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            401,
+            json={"error": {"code": "invalid_credential", "message": "Token unknown"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(InvalidCredentialError):
+        client.assess(address=ADDRESS)
+    client.close()
+
+
+@respx.mock
+def test_quota_exceeded_error_on_429(monkeypatch):
+    from agentscore.errors import QuotaExceededError
+
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda _: None)
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            429,
+            headers={"retry-after": "0"},
+            json={"error": {"code": "quota_exceeded", "message": "Account quota exceeded"}},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(QuotaExceededError) as exc_info:
+        client.assess(address=ADDRESS)
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.code == "quota_exceeded"
+    client.close()
+
+
+@respx.mock
+def test_unknown_4xx_falls_through_to_generic_agentscore_error():
+    """Status codes / error.code combinations the SDK doesn't have a typed subclass for fall
+    through to a generic AgentScoreError so consumers can still inspect status + code."""
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(403, json={"error": {"code": "account_cancelled", "message": "Account cancelled"}}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.assess(address=ADDRESS)
+    # Not a typed subclass — generic AgentScoreError.
+    assert type(exc_info.value) is AgentScoreError
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.code == "account_cancelled"
+    client.close()
+
+
+# ---------------------------------------------------------------------------
+# Quota header capture
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_assess_attaches_quota_field_when_x_quota_headers_present():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            200,
+            headers={
+                "X-Quota-Limit": "1000",
+                "X-Quota-Used": "780",
+                "X-Quota-Reset": "2026-06-01T00:00:00Z",
+            },
+            json={
+                "decision": "allow",
+                "decision_reasons": [],
+                "identity_method": "wallet",
+                "on_the_fly": False,
+                "updated_at": None,
+            },
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    res = client.assess(address=ADDRESS)
+    assert res.get("quota") == {"limit": 1000, "used": 780, "reset": "2026-06-01T00:00:00Z"}
+    client.close()
+
+
+@respx.mock
+def test_assess_omits_quota_when_no_headers_present():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "decision": "allow",
+                "decision_reasons": [],
+                "identity_method": "wallet",
+                "on_the_fly": False,
+                "updated_at": None,
+            },
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    res = client.assess(address=ADDRESS)
+    assert "quota" not in res
+    client.close()
+
+
+@respx.mock
+def test_assess_handles_never_reset_for_unlimited_tiers():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"X-Quota-Limit": "0", "X-Quota-Used": "0", "X-Quota-Reset": "never"},
+            json={
+                "decision": "allow",
+                "decision_reasons": [],
+                "identity_method": "wallet",
+                "on_the_fly": False,
+                "updated_at": None,
+            },
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    res = client.assess(address=ADDRESS)
+    assert res.get("quota") == {"limit": 0, "used": 0, "reset": "never"}
+    client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_attaches_quota_field_when_x_quota_headers_present():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            200,
+            headers={"X-Quota-Limit": "500", "X-Quota-Used": "10", "X-Quota-Reset": "2026-07-01T00:00:00Z"},
+            json={
+                "decision": "allow",
+                "decision_reasons": [],
+                "identity_method": "wallet",
+                "on_the_fly": False,
+                "updated_at": None,
+            },
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    res = await client.aassess(address=ADDRESS)
+    assert res.get("quota") == {"limit": 500, "used": 10, "reset": "2026-07-01T00:00:00Z"}
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# telemetry_signer_match
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_telemetry_signer_match_posts_payload():
+    route = respx.post(f"{BASE_URL}/v1/telemetry/signer-match").mock(return_value=httpx.Response(200))
+    client = AgentScore(api_key=API_KEY)
+    client.telemetry_signer_match({"kind": "pass", "signer": "0xabc", "network": "evm"})
+    assert route.call_count == 1
+    sent = json.loads(route.calls[0].request.content)
+    assert sent == {"kind": "pass", "signer": "0xabc", "network": "evm"}
+    client.close()
+
+
+@respx.mock
+def test_telemetry_signer_match_swallows_errors_silently():
+    respx.post(f"{BASE_URL}/v1/telemetry/signer-match").mock(return_value=httpx.Response(500))
+    client = AgentScore(api_key=API_KEY)
+    # Should NOT raise.
+    client.telemetry_signer_match({"kind": "wallet_signer_mismatch"})
+    client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_atelemetry_signer_match_posts_payload():
+    route = respx.post(f"{BASE_URL}/v1/telemetry/signer-match").mock(return_value=httpx.Response(200))
+    client = AgentScore(api_key=API_KEY)
+    await client.atelemetry_signer_match({"kind": "pass", "network": "solana"})
+    assert route.call_count == 1
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_atelemetry_signer_match_swallows_errors_silently():
+    respx.post(f"{BASE_URL}/v1/telemetry/signer-match").mock(side_effect=httpx.ConnectError("dns down"))
+    client = AgentScore(api_key=API_KEY)
+    # Should NOT raise.
+    await client.atelemetry_signer_match({"kind": "wallet_auth_requires_wallet_signing"})
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Async timeout
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_timeout_raises_typed_timeout_error():
+    from agentscore.errors import TimeoutError as AgentScoreTimeoutError
+
+    respx.post(f"{BASE_URL}/v1/assess").mock(side_effect=httpx.TimeoutException("read timeout"))
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreTimeoutError) as exc_info:
+        await client.aassess(address=ADDRESS)
+    assert isinstance(exc_info.value, AgentScoreError)
+    assert exc_info.value.code == "timeout"
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Helper-function unit tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_quota_number_handles_non_numeric():
+    from agentscore.client import _parse_quota_number
+
+    assert _parse_quota_number(None) is None
+    assert _parse_quota_number("not-a-number") is None
+    assert _parse_quota_number("123") == 123
+    assert _parse_quota_number("0") == 0
+
+
+def test_retry_after_seconds_handles_invalid():
+    from agentscore.client import _retry_after_seconds
+
+    fake_response = httpx.Response(429, headers={"retry-after": "not-a-number"})
+    assert _retry_after_seconds(fake_response) == 1.0
+
+
+def test_extract_quota_returns_none_when_no_headers():
+    from agentscore.client import _extract_quota
+
+    fake_response = httpx.Response(200)
+    assert _extract_quota(fake_response) is None
+
+
+def test_extract_quota_falls_back_to_none_for_malformed_numeric_headers():
+    from agentscore.client import _extract_quota
+
+    fake_response = httpx.Response(
+        200,
+        headers={
+            "X-Quota-Limit": "not-numeric",
+            "X-Quota-Used": "also-not-numeric",
+            "X-Quota-Reset": "2026-06-01",
+        },
+    )
+    quota = _extract_quota(fake_response)
+    assert quota == {"limit": None, "used": None, "reset": "2026-06-01"}
+
+
+@respx.mock
+def test_assess_retry_after_429_then_timeout_raises_typed_timeout_error(monkeypatch):
+    from agentscore.errors import TimeoutError as AgentScoreTimeoutError
+
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda _: None)
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "0"}, json={}),
+            httpx.TimeoutException("read timeout"),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreTimeoutError):
+        client.assess(address=ADDRESS)
+    client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_retry_after_429_then_timeout_raises_typed_timeout_error(monkeypatch):
+    from agentscore.errors import TimeoutError as AgentScoreTimeoutError
+
+    async def _no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("agentscore.client.asyncio.sleep", _no_sleep)
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "0"}, json={}),
+            httpx.TimeoutException("read timeout"),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreTimeoutError):
+        await client.aassess(address=ADDRESS)
     await client.aclose()
