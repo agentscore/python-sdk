@@ -9,7 +9,7 @@ Two identity paths: `X-Wallet-Address` (wallet-based) and `X-Operator-Token` (cr
 ## Methods (sync + async)
 
 - `get_reputation` / `aget_reputation` — cached reputation lookup (free)
-- `assess` / `aassess` — identity gate with policy (paid). Accepts `operator_token` for non-wallet agents. Response includes `linked_wallets[]` and `resolved_operator`.
+- `assess` / `aassess` — identity gate with policy (paid). Accepts `operator_token` for non-wallet agents. Response includes `linked_wallets[]` and `resolved_operator`. Optional `resolve_signer: { address, network }` opts into server-side wallet-signer-match — the response then carries a `signer_match` block describing whether the supplied signer wallet resolves to the same operator as the claimed `address`.
 - `create_session` / `acreate_session` — create verification session. Returns `agent_memory` + `next_steps`.
 - `poll_session` / `apoll_session` — poll session status, returns credential when verified, plus `next_steps.action`.
 - `create_credential` / `acreate_credential` — create operator credential (24h TTL default). Response includes `agent_memory`.

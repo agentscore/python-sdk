@@ -137,6 +137,7 @@ if TYPE_CHECKING:
         DecisionPolicy,
         Network,
         ReputationResponse,
+        ResolveSigner,
         SessionCreateResponse,
         SessionPollResponse,
     )
@@ -254,8 +255,14 @@ class AgentScore:
         refresh: bool | None = None,
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
+        resolve_signer: ResolveSigner | None = None,
     ) -> AssessResponse:
-        """Assess a wallet or operator (paid, writes score on-the-fly)."""
+        """Assess a wallet or operator (paid, writes score on-the-fly).
+
+        ``resolve_signer`` opts into server-side wallet-signer-match: when supplied,
+        the API resolves the signer wallet against the claimed ``address`` and emits
+        a ``signer_match`` block on the response. See :class:`ResolveSigner`.
+        """
         body: dict[str, Any] = {}
         if address:
             body["address"] = address
@@ -267,6 +274,8 @@ class AgentScore:
             body["refresh"] = refresh
         if policy is not None:
             body["policy"] = dict(policy)
+        if resolve_signer is not None:
+            body["resolve_signer"] = dict(resolve_signer)
         client = self._get_sync_client()
         data, response = self._send_sync_with_response(lambda: client.post("/v1/assess", json=body))
         quota = _extract_quota(response)
@@ -384,8 +393,13 @@ class AgentScore:
         refresh: bool | None = None,
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
+        resolve_signer: ResolveSigner | None = None,
     ) -> AssessResponse:
-        """Assess a wallet or operator (paid, writes score on-the-fly)."""
+        """Assess a wallet or operator (paid, writes score on-the-fly).
+
+        ``resolve_signer`` opts into server-side wallet-signer-match — async mirror of
+        :meth:`assess`.
+        """
         body: dict[str, Any] = {}
         if address:
             body["address"] = address
@@ -397,6 +411,8 @@ class AgentScore:
             body["refresh"] = refresh
         if policy is not None:
             body["policy"] = dict(policy)
+        if resolve_signer is not None:
+            body["resolve_signer"] = dict(resolve_signer)
         client = self._get_async_client()
         data, response = await self._send_async_with_response(lambda: client.post("/v1/assess", json=body))
         quota = _extract_quota(response)

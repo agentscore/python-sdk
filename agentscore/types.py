@@ -169,12 +169,64 @@ class DecisionPolicy(TypedDict, total=False):
     allowed_jurisdictions: list[str]
 
 
+class ResolveSigner(TypedDict):
+    """Server-side wallet-signer-match request.
+
+    When passed to ``assess()`` / ``aassess()``, the API resolves this signer wallet
+    against the claimed ``address`` and emits a ``signer_match`` block on the response.
+    Lets commerce gates collapse the legacy 2 follow-up assess calls (one per wallet)
+    into the gate's primary assess call. Strictly additive — old clients that don't
+    pass this field see no ``signer_match`` on the response.
+    """
+
+    # Recovered payment-signer wallet. ``None`` indicates the rail carries no wallet
+    # signature (Stripe SPT, card) — produces
+    # ``signer_match.kind = "wallet_auth_requires_wallet_signing"``.
+    address: str | None
+    # Key-derivation family of the signer wallet.
+    network: Literal["evm", "solana"]
+
+
+class SignerMatch(TypedDict, total=False):
+    """Server-side wallet-signer-match verdict.
+
+    Emitted on ``AssessResponse.signer_match`` when the request supplied
+    ``resolve_signer``. Mirrors the verdict shape commerce SDK gates produce locally;
+    SDK consumers spread this into 403 bodies verbatim instead of re-deriving via 2
+    extra ``/v1/assess`` round trips.
+
+    Fields populated depend on ``kind``.
+    """
+
+    # ``pass`` — claimed wallet and signer wallet resolve to the same operator (or are
+    # byte-equal). ``wallet_signer_mismatch`` — operators differ.
+    # ``wallet_auth_requires_wallet_signing`` — request supplied ``address: None`` (rail
+    # has no wallet signer); agent should switch to operator_token auth.
+    kind: Literal["pass", "wallet_signer_mismatch", "wallet_auth_requires_wallet_signing"]
+    # Operator the claimed wallet resolves to. ``None`` if unlinked.
+    claimed_operator: str | None
+    # Operator the signer wallet resolves to. ``None`` if unlinked.
+    signer_operator: str | None
+    # Echoed only on ``wallet_auth_requires_wallet_signing`` — the claimed wallet from
+    # the request. Helps agents construct the recovery message.
+    claimed_wallet: str
+    # Echoed on ``wallet_signer_mismatch`` — the claimed wallet, normalized.
+    expected_signer: str
+    # Echoed on ``wallet_signer_mismatch`` — the signer wallet, normalized.
+    actual_signer: str
+    # Same-operator linked wallets the agent could re-sign from to satisfy the claim.
+    # Mirrors the top-level ``linked_wallets`` deny-guard — omitted on ``deny`` verdicts.
+    linked_wallets: list[str]
+    # JSON-encoded ``{action, steps, user_message}`` envelope for SDK denial bodies.
+    # Authoritative copy lives server-side; SDK consumers spread this into their 403
+    # body without re-parsing.
+    agent_instructions: str
+
+
 class _AssessResponseRequired(TypedDict):
     decision: str | None
     decision_reasons: list[str]
     identity_method: Literal["wallet", "operator_token"]
-    on_the_fly: bool
-    updated_at: str | None
 
 
 class PolicyExplanation(TypedDict, total=False):
@@ -211,6 +263,9 @@ class AssessResponse(_AssessResponseRequired, total=False):
     verify_url: str
     policy_result: PolicyResult | None
     explanation: NotRequired[list[PolicyExplanation]]
+    # Server-side wallet-signer-match verdict, returned only when the request supplied
+    # ``resolve_signer``. Empty otherwise.
+    signer_match: NotRequired[SignerMatch]
     # Quota state for this account, captured from response headers on the success path.
     # Use to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before 429.
     quota: NotRequired[QuotaInfo]
