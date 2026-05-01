@@ -355,9 +355,9 @@ DenialCode = Literal[
     "wallet_not_trusted",
     "api_error",
     "payment_required",
-    # Merchant-emitted convenience codes (e.g. martin-estate's on_denied wraps gate
-    # denials into wine-specific business codes). Not emitted by the AgentScore API
-    # itself but appear in 4xx bodies the SDK may surface back to callers.
+    # Merchant-emitted convenience codes — not emitted by the AgentScore API itself,
+    # but may appear in 4xx bodies passing through the SDK from merchants whose gate
+    # `on_denied` hook wraps AgentScore denials into business-domain codes.
     "operator_verification_required",
     "compliance_denied",
     "compliance_error",
