@@ -59,6 +59,32 @@ def _parse_quota_number(raw: str | None) -> int | None:
         return None
 
 
+def _do_sync(send_fn: Callable[[], httpx.Response]) -> httpx.Response:
+    """Execute the sync request, wrapping every httpx-layer failure in a typed AgentScoreError.
+
+    ``httpx.TimeoutException`` (and subclasses: ConnectTimeout / ReadTimeout / WriteTimeout /
+    PoolTimeout) becomes our :class:`TimeoutError`. Every other ``httpx.HTTPError`` (ConnectError,
+    NetworkError, ProtocolError, etc.) becomes :class:`AgentScoreError` with ``code='network_error'``
+    and ``status_code=0`` — parity with the node-sdk catch-all.
+    """
+    try:
+        return send_fn()
+    except httpx.TimeoutException as exc:
+        raise TimeoutError(str(exc)) from exc
+    except httpx.HTTPError as exc:
+        raise AgentScoreError("network_error", str(exc), 0) from exc
+
+
+async def _do_async(send_fn: Callable[[], Awaitable[httpx.Response]]) -> httpx.Response:
+    """Async variant of :func:`_do_sync`."""
+    try:
+        return await send_fn()
+    except httpx.TimeoutException as exc:
+        raise TimeoutError(str(exc)) from exc
+    except httpx.HTTPError as exc:
+        raise AgentScoreError("network_error", str(exc), 0) from exc
+
+
 def _build_error_from_response(response: httpx.Response) -> AgentScoreError:
     """Map a non-2xx ``httpx.Response`` to the right typed :class:`AgentScoreError` subclass.
 
@@ -163,16 +189,10 @@ class AgentScore:
 
     def _send_sync(self, send_fn: Callable[[], httpx.Response]) -> Any:
         """Issue a request, retry once on 429 honoring retry-after, then parse."""
-        try:
-            response = send_fn()
-        except httpx.TimeoutException as exc:
-            raise TimeoutError(str(exc)) from exc
+        response = _do_sync(send_fn)
         if response.status_code == 429:
             time.sleep(_retry_after_seconds(response))
-            try:
-                response = send_fn()
-            except httpx.TimeoutException as exc:
-                raise TimeoutError(str(exc)) from exc
+            response = _do_sync(send_fn)
         return self._handle_response(response)
 
     def _send_sync_with_response(self, send_fn: Callable[[], httpx.Response]) -> tuple[Any, httpx.Response]:
@@ -181,46 +201,28 @@ class AgentScore:
         Variant of :meth:`_send_sync` that exposes the raw ``httpx.Response`` so callers
         (e.g. :meth:`assess`) can read response headers like ``X-Quota-*``.
         """
-        try:
-            response = send_fn()
-        except httpx.TimeoutException as exc:
-            raise TimeoutError(str(exc)) from exc
+        response = _do_sync(send_fn)
         if response.status_code == 429:
             time.sleep(_retry_after_seconds(response))
-            try:
-                response = send_fn()
-            except httpx.TimeoutException as exc:
-                raise TimeoutError(str(exc)) from exc
+            response = _do_sync(send_fn)
         return self._handle_response(response), response
 
     async def _send_async(self, send_fn: Callable[[], Awaitable[httpx.Response]]) -> Any:
         """Async variant of :meth:`_send_sync`."""
-        try:
-            response = await send_fn()
-        except httpx.TimeoutException as exc:
-            raise TimeoutError(str(exc)) from exc
+        response = await _do_async(send_fn)
         if response.status_code == 429:
             await asyncio.sleep(_retry_after_seconds(response))
-            try:
-                response = await send_fn()
-            except httpx.TimeoutException as exc:
-                raise TimeoutError(str(exc)) from exc
+            response = await _do_async(send_fn)
         return self._handle_response(response)
 
     async def _send_async_with_response(
         self, send_fn: Callable[[], Awaitable[httpx.Response]]
     ) -> tuple[Any, httpx.Response]:
         """Async variant of :meth:`_send_sync_with_response`."""
-        try:
-            response = await send_fn()
-        except httpx.TimeoutException as exc:
-            raise TimeoutError(str(exc)) from exc
+        response = await _do_async(send_fn)
         if response.status_code == 429:
             await asyncio.sleep(_retry_after_seconds(response))
-            try:
-                response = await send_fn()
-            except httpx.TimeoutException as exc:
-                raise TimeoutError(str(exc)) from exc
+            response = await _do_async(send_fn)
         return self._handle_response(response), response
 
     def _handle_response(self, response: httpx.Response) -> Any:

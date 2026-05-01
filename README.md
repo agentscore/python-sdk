@@ -147,17 +147,59 @@ except AgentScoreError as e:
     print(e.code, e.status_code, str(e))
 ```
 
-`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing:
+`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing.
+
+### Typed error classes
+
+For status-code-specific recovery, the SDK raises typed subclasses of `AgentScoreError`. All inherit from `AgentScoreError` so existing `except AgentScoreError` still catches them.
+
+| Class | Triggered by | What it adds |
+|---|---|---|
+| `PaymentRequiredError` | HTTP 402 | The endpoint is not enabled for this account |
+| `TokenExpiredError` | HTTP 401 with `error.code = "token_expired"` | Parsed body fields on the instance: `verify_url`, `session_id`, `poll_secret`, `poll_url`, `next_steps`, `agent_memory` — recover without re-parsing `details` |
+| `InvalidCredentialError` | HTTP 401 with `error.code = "invalid_credential"` | Permanent — switch tokens or restart |
+| `QuotaExceededError` | HTTP 429 with `error.code = "quota_exceeded"` | Account-level cap reached; don't retry |
+| `RateLimitedError` | HTTP 429 with `error.code = "rate_limited"` | Per-second sliding-window cap; retry after `Retry-After` |
+| `TimeoutError` | `httpx.TimeoutException` (connect/read/write/pool timeout) | Distinct from generic network errors. Note: subclasses `AgentScoreError`, **not** the builtin `TimeoutError` — import explicitly from `agentscore.errors` to disambiguate. |
+
+All non-timeout `httpx.HTTPError` (ConnectError, ProtocolError, NetworkError, etc.) are wrapped as `AgentScoreError(code="network_error", status_code=0)`.
 
 ```python
+from agentscore import (
+    AgentScore, AgentScoreError, TokenExpiredError, QuotaExceededError,
+)
+from agentscore.errors import TimeoutError as AgentScoreTimeoutError
+
 try:
     client.assess("0xabc...", policy={"require_kyc": True})
+except TokenExpiredError as e:
+    print("Verify at:", e.verify_url, "poll with:", e.poll_secret)
+except QuotaExceededError as e:
+    print("Account quota reached — surface to user; don't retry.")
+except AgentScoreTimeoutError:
+    print("Network timeout — retry with backoff.")
 except AgentScoreError as e:
-    if e.code == "wallet_signer_mismatch":
-        print("Re-sign from one of:", e.details.get("linked_wallets"))
-    elif e.code == "token_expired":
-        print("Verify at:", e.details.get("verify_url"))
+    print(e.code, e.message)
 ```
+
+## Quota observability
+
+`assess()` (and `aassess()`) responses include an optional `quota` field captured from `X-Quota-Limit` / `X-Quota-Used` / `X-Quota-Reset` response headers. Use it to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before a 429:
+
+```python
+result = client.assess("0xabc...", policy={"require_kyc": True})
+quota = result.get("quota")
+if quota and quota["limit"] and quota["used"]:
+    pct = (quota["used"] / quota["limit"]) * 100
+    if pct > 80:
+        print(f"AgentScore quota at {pct:.1f}% — resets {quota['reset']}")
+```
+
+`quota` is absent when the API doesn't emit the headers (Enterprise / unlimited tiers).
+
+## Telemetry
+
+`telemetry_signer_match(payload)` and `atelemetry_signer_match(payload)` are fire-and-forget POSTs to `/v1/telemetry/signer-match` so AgentScore can track aggregate signer-binding behavior across merchants. Used internally by `agentscore-commerce`'s gate; available directly for custom integrations that perform their own wallet-signer-match checks.
 
 ## Documentation
 

@@ -503,8 +503,12 @@ def test_timeout_error_raises_agentscore_error():
 def test_connect_error_raises_agentscore_error():
     respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(side_effect=httpx.ConnectError("connection refused"))
     client = AgentScore(api_key=API_KEY)
-    with pytest.raises(httpx.ConnectError):
+    with pytest.raises(AgentScoreError) as exc_info:
         client.get_reputation(ADDRESS)
+    # All httpx-layer errors (Timeout, Connect, Protocol, Network) are wrapped — parity with node-sdk.
+    # ConnectError specifically maps to network_error; TimeoutException is the only one that becomes TimeoutError.
+    assert exc_info.value.code == "network_error"
+    assert exc_info.value.status_code == 0
 
 
 @respx.mock
