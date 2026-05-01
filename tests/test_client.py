@@ -1892,3 +1892,124 @@ async def test_aassess_retry_after_429_then_timeout_raises_typed_timeout_error(m
     with pytest.raises(AgentScoreTimeoutError):
         await client.aassess(address=ADDRESS)
     await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Quota capture on retry path + generic 4xx fallthrough + TokenExpiredError edge cases
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_assess_captures_quota_from_retry_response_on_429_then_200(monkeypatch):
+    """The retry on 429 should capture quota headers from the SUCCESSFUL retry response,
+    not the discarded 429. Regression guard for the requestWithHeaders retry path."""
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda _: None)
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "0"}, json={}),
+            httpx.Response(
+                200,
+                headers={
+                    "X-Quota-Limit": "500",
+                    "X-Quota-Used": "321",
+                    "X-Quota-Reset": "2026-07-01T00:00:00Z",
+                },
+                json={
+                    "decision": "allow",
+                    "decision_reasons": [],
+                    "identity_method": "wallet",
+                    "on_the_fly": False,
+                    "updated_at": None,
+                },
+            ),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    res = client.assess(address=ADDRESS)
+    assert res.get("quota") == {"limit": 500, "used": 321, "reset": "2026-07-01T00:00:00Z"}
+    client.close()
+
+
+@respx.mock
+def test_unknown_400_invalid_request_falls_through_to_generic_agentscore_error():
+    """400 codes the SDK doesn't have a typed subclass for must fall through to a generic
+    AgentScoreError so consumers can still inspect status + code."""
+    from agentscore.errors import (
+        InvalidCredentialError,
+        PaymentRequiredError,
+        QuotaExceededError,
+        RateLimitedError,
+        TokenExpiredError,
+    )
+    from agentscore.errors import TimeoutError as AgentScoreTimeoutError
+
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(400, json={"error": {"code": "invalid_request", "message": "bad body"}}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.assess(address=ADDRESS)
+    err = exc_info.value
+    # Must NOT be any typed subclass.
+    assert not isinstance(err, PaymentRequiredError)
+    assert not isinstance(err, TokenExpiredError)
+    assert not isinstance(err, InvalidCredentialError)
+    assert not isinstance(err, QuotaExceededError)
+    assert not isinstance(err, RateLimitedError)
+    assert not isinstance(err, AgentScoreTimeoutError)
+    # Generic — type is exactly AgentScoreError, not a subclass.
+    assert type(err) is AgentScoreError
+    assert err.code == "invalid_request"
+    assert err.status_code == 400
+    client.close()
+
+
+@respx.mock
+def test_token_expired_error_fields_undefined_when_api_omits_them():
+    """If API returns 401 token_expired with no verify_url / session_id / poll_secret /
+    next_steps / agent_memory in the body, the instance fields stay None — error is still
+    a TokenExpiredError (not falling through to generic)."""
+    from agentscore.errors import TokenExpiredError
+
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(401, json={"error": {"code": "token_expired", "message": "Expired"}}),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(TokenExpiredError) as exc_info:
+        client.assess(address=ADDRESS)
+    err = exc_info.value
+    assert err.verify_url is None
+    assert err.session_id is None
+    assert err.poll_secret is None
+    assert err.poll_url is None
+    assert err.next_steps is None
+    assert err.agent_memory is None
+    client.close()
+
+
+@respx.mock
+def test_token_expired_error_ignores_wrong_typed_body_fields():
+    """If API returns wrong types for the parsed body fields (e.g. number for verify_url),
+    the instance fields stay None but the raw value is preserved in `details`."""
+    from agentscore.errors import TokenExpiredError
+
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            401,
+            json={
+                "error": {"code": "token_expired", "message": "Expired"},
+                "verify_url": 12345,  # wrong type
+                "session_id": ["not", "a", "string"],
+            },
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(TokenExpiredError) as exc_info:
+        client.assess(address=ADDRESS)
+    err = exc_info.value
+    # Strings only — wrong types ignored, instance fields stay None.
+    assert err.verify_url is None
+    assert err.session_id is None
+    # Raw values still in details for inspection.
+    assert err.details["verify_url"] == 12345
+    client.close()
