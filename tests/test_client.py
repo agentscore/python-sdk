@@ -275,6 +275,134 @@ def test_assess_forwards_policy_in_body():
 
 
 # ---------------------------------------------------------------------------
+# assess: signer (server-side wallet-signer-match + sanctions screening)
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_assess_forwards_signer_in_body():
+    """assess(signer={...}) opts into server-side wallet-signer-match + signer-sanctions."""
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    signer = {"address": "0xsigner000000000000000000000000000000abc1", "network": "evm"}
+    client.assess(ADDRESS, signer=signer)
+    body = json.loads(route.calls.last.request.content)
+    assert body["signer"] == signer
+
+
+@respx.mock
+def test_assess_signer_omitted_when_none():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS)
+    body = json.loads(route.calls.last.request.content)
+    assert "signer" not in body
+
+
+@respx.mock
+def test_assess_returns_signer_match_and_signer_sanctions():
+    """Response surface: signer_match (wallet-binding) + signer_sanctions (OFAC SDN) compose on the same call."""
+    payload = {
+        **ASSESS_PAYLOAD,
+        "signer_match": {
+            "kind": "wallet_signer_mismatch",
+            "claimed_operator": "op_claimed",
+            "signer_operator": "op_attacker",
+            "expected_signer": "0xclaimed",
+            "actual_signer": "0xattacker",
+            "linked_wallets": ["0xclaimed"],
+            "agent_instructions": '{"action":"resign_or_switch_to_operator_token","steps":[],"user_message":"x"}',
+        },
+        "signer_sanctions": {
+            "sanctioned": True,
+            "ofac_label": "ETH",
+            "sdn_uid": "19011",
+            "listed_at": "2019-09-13T07:00:00.000Z",
+        },
+    }
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=payload))
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(ADDRESS, signer={"address": "0xattacker", "network": "evm"})
+    assert result["signer_match"]["kind"] == "wallet_signer_mismatch"
+    assert result["signer_match"]["expected_signer"] == "0xclaimed"
+    assert result["signer_sanctions"]["sanctioned"] is True
+    assert result["signer_sanctions"]["ofac_label"] == "ETH"
+
+
+@respx.mock
+def test_assess_returns_signer_sanctions_clear():
+    payload = {**ASSESS_PAYLOAD, "signer_sanctions": {"status": "clear"}}
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=payload))
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(ADDRESS, signer={"address": "0xsigner", "network": "evm"})
+    assert result["signer_sanctions"]["status"] == "clear"
+
+
+@respx.mock
+def test_assess_returns_signer_sanctions_unavailable():
+    payload = {**ASSESS_PAYLOAD, "signer_sanctions": {"status": "unavailable"}}
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=payload))
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(ADDRESS, signer={"address": "0xsigner", "network": "evm"})
+    assert result["signer_sanctions"]["status"] == "unavailable"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_forwards_signer_in_body():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    signer = {"address": "0xsignerasync", "network": "solana"}
+    await client.aassess(ADDRESS, signer=signer)
+    body = json.loads(route.calls.last.request.content)
+    assert body["signer"] == signer
+    await client.aclose()
+
+
+@respx.mock
+def test_assess_signer_preserves_solana_case():
+    """Solana addresses are case-sensitive; signer must thread through unmodified."""
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    # Real-shape Solana base58 mixed case
+    sol = "DRpbCBMxVnDK7maPM5tGv6MvB3v1sRMC86PZ8okm21hy"
+    client.assess(ADDRESS, signer={"address": sol, "network": "solana"})
+    body = json.loads(route.calls.last.request.content)
+    assert body["signer"]["address"] == sol  # byte-equal, no lowercasing
+
+
+@respx.mock
+def test_assess_signer_address_null_forwarded():
+    """signer.address=None for rails with no wallet signer (Stripe SPT, card)."""
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS, signer={"address": None, "network": "evm"})
+    body = json.loads(route.calls.last.request.content)
+    assert body["signer"] == {"address": None, "network": "evm"}
+
+
+@respx.mock
+def test_assess_signer_raises_token_expired_with_signer():
+    """signer + 401 token_expired: TokenExpiredError raised; signer was still sent."""
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            401,
+            json={
+                "error": {"code": "token_expired", "message": "expired"},
+                "verify_url": "https://example/verify",
+            },
+        )
+    )
+    from agentscore.errors import TokenExpiredError
+
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(TokenExpiredError):
+        client.assess(operator_token="opc_expired", signer={"address": "0xs", "network": "evm"})
+    body = json.loads(route.calls.last.request.content)
+    assert body["signer"] == {"address": "0xs", "network": "evm"}
+
+
+# ---------------------------------------------------------------------------
 # Async: aget_reputation
 # ---------------------------------------------------------------------------
 
