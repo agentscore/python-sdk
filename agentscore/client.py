@@ -507,9 +507,9 @@ class AgentScore:
     def telemetry_signer_match(self, payload: dict[str, Any]) -> None:
         """Fire-and-forget telemetry — report a wallet-signer-match verdict.
 
-        Used internally by the commerce gate's ``verify_wallet_signer_match`` helper to track
-        aggregate signer-binding behavior across merchants. Does not raise; failures are
-        logged at warning level so persistent telemetry outages are visible in ops logs.
+        Tracks aggregate signer-binding behavior across merchants. Does not raise;
+        failures are logged at warning level so persistent telemetry outages are visible
+        in ops logs.
         """
         try:
             client = self._get_sync_client()
