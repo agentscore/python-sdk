@@ -187,7 +187,7 @@ class Signer(TypedDict):
     network: Literal["evm", "solana"]
 
 
-class SignerMatch(TypedDict, total=False):
+class SignerMatch(TypedDict):
     """Server-side wallet-signer-match verdict.
 
     Emitted on ``AssessResponse.signer_match`` when the request supplied
@@ -195,7 +195,7 @@ class SignerMatch(TypedDict, total=False):
     SDK consumers spread this into 403 bodies verbatim instead of re-deriving via 2
     extra ``/v1/assess`` round trips.
 
-    Fields populated depend on ``kind``.
+    ``kind`` is always present; other fields depend on which kind was emitted.
     """
 
     # ``pass`` — claimed wallet and signer wallet resolve to the same operator (or are
@@ -204,23 +204,23 @@ class SignerMatch(TypedDict, total=False):
     # has no wallet signer); agent should switch to operator_token auth.
     kind: Literal["pass", "wallet_signer_mismatch", "wallet_auth_requires_wallet_signing"]
     # Operator the claimed wallet resolves to. ``None`` if unlinked.
-    claimed_operator: str | None
+    claimed_operator: NotRequired[str | None]
     # Operator the signer wallet resolves to. ``None`` if unlinked.
-    signer_operator: str | None
+    signer_operator: NotRequired[str | None]
     # Echoed only on ``wallet_auth_requires_wallet_signing`` — the claimed wallet from
     # the request. Helps agents construct the recovery message.
-    claimed_wallet: str
+    claimed_wallet: NotRequired[str]
     # Echoed on ``wallet_signer_mismatch`` — the claimed wallet, normalized.
-    expected_signer: str
+    expected_signer: NotRequired[str]
     # Echoed on ``wallet_signer_mismatch`` — the signer wallet, normalized.
-    actual_signer: str
+    actual_signer: NotRequired[str]
     # Same-operator linked wallets the agent could re-sign from to satisfy the claim.
     # Mirrors the top-level ``linked_wallets`` deny-guard — omitted on ``deny`` verdicts.
-    linked_wallets: list[str]
+    linked_wallets: NotRequired[list[str]]
     # JSON-encoded ``{action, steps, user_message}`` envelope for SDK denial bodies.
     # Authoritative copy lives server-side; SDK consumers spread this into their 403
     # body without re-parsing.
-    agent_instructions: str
+    agent_instructions: NotRequired[str]
 
 
 class SignerSanctionsClear(TypedDict):
@@ -441,7 +441,8 @@ namespace with a different key scheme."""
 
 
 class AssociateWalletResponse(TypedDict):
-    associated: bool
+    # Always ``True`` on 2xx; failures surface via :class:`AgentScoreError` instead.
+    associated: Literal[True]
     first_seen: bool
     deduped: NotRequired[bool]
     # Cross-merchant pattern hint. Emitted only on the first wallet capture (first_seen=True)
