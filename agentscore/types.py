@@ -234,6 +234,8 @@ class SignerSanctionsHit(TypedDict):
 
     Under ``policy.require_sanctions_clear``, this verdict flips the response
     ``decision`` to ``deny`` with ``decision_reasons`` including ``sanctions_flagged``.
+    An :class:`SignerSanctionsUnavailable` verdict under the same policy yields
+    ``decision_reasons`` including ``sanctions_check_unavailable`` (fail-closed).
     """
 
     sanctioned: Literal[True]
