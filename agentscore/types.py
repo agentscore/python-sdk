@@ -169,7 +169,7 @@ class DecisionPolicy(TypedDict, total=False):
     allowed_jurisdictions: list[str]
 
 
-class ResolveSigner(TypedDict):
+class Signer(TypedDict):
     """Server-side wallet-signer-match request.
 
     When passed to ``assess()`` / ``aassess()``, the API resolves this signer wallet
@@ -191,7 +191,7 @@ class SignerMatch(TypedDict, total=False):
     """Server-side wallet-signer-match verdict.
 
     Emitted on ``AssessResponse.signer_match`` when the request supplied
-    ``resolve_signer``. Mirrors the verdict shape commerce SDK gates produce locally;
+    ``signer``. Mirrors the verdict shape commerce SDK gates produce locally;
     SDK consumers spread this into 403 bodies verbatim instead of re-deriving via 2
     extra ``/v1/assess`` round trips.
 
@@ -221,6 +221,46 @@ class SignerMatch(TypedDict, total=False):
     # Authoritative copy lives server-side; SDK consumers spread this into their 403
     # body without re-parsing.
     agent_instructions: str
+
+
+class SignerSanctionsClear(TypedDict):
+    """Server-side wallet-sanctions verdict — address NOT on the OFAC SDN list."""
+
+    status: Literal["clear"]
+
+
+class SignerSanctionsHit(TypedDict):
+    """Server-side wallet-sanctions verdict — address IS on the OFAC SDN list.
+
+    Under ``policy.require_sanctions_clear``, this verdict flips the response
+    ``decision`` to ``deny`` with ``decision_reasons`` including ``sanctions_flagged``.
+    """
+
+    sanctioned: Literal[True]
+    # Raw OFAC Digital Currency Address label the hit was published under (``ETH``,
+    # ``XBT``, ``USDT``, ``SOL``, ...). Investigation-history metadata; the gate's
+    # enforcement axis is the format-classified family, not this label.
+    ofac_label: str
+    # SDN entry's Identity ID. Same ``sdn_uid`` may surface multiple addresses (one
+    # entity, multiple wallets); join key for audit.
+    sdn_uid: str
+    # ISO date OFAC initially designated the entity. ``None`` if upstream omits.
+    listed_at: str | None
+
+
+class SignerSanctionsUnavailable(TypedDict):
+    """Server-side wallet-sanctions verdict — lookup itself failed.
+
+    Under ``policy.require_sanctions_clear``, the gate fail-closes — falsely allowing
+    a sanctioned settle is an OFAC strict-liability violation; falsely denying a clean
+    buyer is bad UX.
+    """
+
+    status: Literal["unavailable"]
+
+
+# Discriminated union: branch on ``status`` (clear/unavailable) vs ``sanctioned`` (True).
+SignerSanctions = SignerSanctionsClear | SignerSanctionsHit | SignerSanctionsUnavailable
 
 
 class _AssessResponseRequired(TypedDict):
@@ -264,8 +304,11 @@ class AssessResponse(_AssessResponseRequired, total=False):
     policy_result: PolicyResult | None
     explanation: NotRequired[list[PolicyExplanation]]
     # Server-side wallet-signer-match verdict, returned only when the request supplied
-    # ``resolve_signer``. Empty otherwise.
+    # ``signer``. Empty otherwise.
     signer_match: NotRequired[SignerMatch]
+    # Server-side OFAC SDN wallet-address verdict, returned only when the request supplied
+    # ``signer``. Empty otherwise.
+    signer_sanctions: NotRequired[SignerSanctions]
     # Quota state for this account, captured from response headers on the success path.
     # Use to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before 429.
     quota: NotRequired[QuotaInfo]
