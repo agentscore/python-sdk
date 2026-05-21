@@ -232,10 +232,13 @@ class SignerSanctionsClear(TypedDict):
 class SignerSanctionsHit(TypedDict):
     """Server-side wallet-sanctions verdict — address IS on the OFAC SDN list.
 
-    Under ``policy.require_sanctions_clear``, this verdict flips the response
-    ``decision`` to ``deny`` with ``decision_reasons`` including ``sanctions_flagged``.
-    An :class:`SignerSanctionsUnavailable` verdict under the same policy yields
-    ``decision_reasons`` including ``sanctions_check_unavailable`` (fail-closed).
+    Wallet-OFAC enforcement on the ``signer`` block is unconditional whenever
+    a signer is supplied. This verdict flips the response ``decision`` to
+    ``deny`` with ``decision_reasons`` including ``sanctions_flagged``. An
+    :class:`SignerSanctionsUnavailable` verdict yields ``decision_reasons``
+    including ``sanctions_check_unavailable`` (fail-closed). No
+    ``policy.require_sanctions_clear`` opt-in required (that flag gates the
+    separate NAME-based screen on the resolved operator's KYC identity).
     """
 
     sanctioned: Literal[True]
@@ -253,9 +256,9 @@ class SignerSanctionsHit(TypedDict):
 class SignerSanctionsUnavailable(TypedDict):
     """Server-side wallet-sanctions verdict — lookup itself failed.
 
-    Under ``policy.require_sanctions_clear``, the gate fail-closes — falsely allowing
-    a sanctioned settle is an OFAC strict-liability violation; falsely denying a clean
-    buyer is bad UX.
+    Fail-closed: the gate denies whenever a signer was supplied and the OFAC
+    lookup couldn't resolve. Falsely allowing a sanctioned settle is an OFAC
+    strict-liability violation; falsely denying a clean buyer is bad UX.
     """
 
     status: Literal["unavailable"]
