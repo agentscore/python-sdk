@@ -14,17 +14,13 @@ class AgentScoreError(Exception):
         self.status_code = status_code
         # Response-body fields beyond `error.{code,message}` — e.g. verify_url,
         # linked_wallets, claimed_operator, actual_signer, reasons. Consumers
-        # branch on these for granular recovery (see the mcp denial-code rendering
-        # in the node sibling for the canonical use). Defaults to {} so callers
+        # branch on these for granular recovery. Defaults to {} so callers
         # constructing this error by hand without a body can omit it.
         self.details: dict[str, Any] = details or {}
 
     @property
     def status(self) -> int:
-        """Alias for ``status_code`` — parity with node-sdk's attribute name.
-
-        Polyglot codebases can use ``err.status`` regardless of which SDK raised the error.
-        """
+        """Alias for ``status_code`` so ``err.status`` also works."""
         return self.status_code
 
 

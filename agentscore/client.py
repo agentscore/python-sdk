@@ -65,7 +65,7 @@ def _do_sync(send_fn: Callable[[], httpx.Response]) -> httpx.Response:
     ``httpx.TimeoutException`` (and subclasses: ConnectTimeout / ReadTimeout / WriteTimeout /
     PoolTimeout) becomes our :class:`TimeoutError`. Every other ``httpx.HTTPError`` (ConnectError,
     NetworkError, ProtocolError, etc.) becomes :class:`AgentScoreError` with ``code='network_error'``
-    and ``status_code=0`` — parity with the node-sdk catch-all.
+    and ``status_code=0``.
     """
     try:
         return send_fn()
@@ -227,7 +227,9 @@ class AgentScore:
         return self._handle_response(response), response
 
     def _handle_response(self, response: httpx.Response) -> Any:
-        if response.status_code >= 400:
+        # Treat any non-2xx as an error. httpx does not follow redirects by default,
+        # so a 3xx would otherwise fall through to the JSON-parse success path.
+        if not (200 <= response.status_code < 300):
             raise _build_error_from_response(response)
         try:
             return response.json()

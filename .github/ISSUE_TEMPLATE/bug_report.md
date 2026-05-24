@@ -17,5 +17,5 @@ What you expected to happen.
 
 **Environment**
 - Package version:
-- Runtime (Node.js/Python version):
+- Python version:
 - OS:
