@@ -2141,3 +2141,280 @@ def test_token_expired_error_ignores_wrong_typed_body_fields():
     # Raw values still in details for inspection.
     assert err.details["verify_url"] == 12345
     client.close()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: 429 retry on non-assess methods (_send_sync / _send_async)
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_create_session_retries_once_on_429_then_succeeds(monkeypatch):
+    """`create_session` uses `_send_sync` (no response handle), exercising the 429
+    retry branch distinct from `assess`'s `_send_sync_with_response`."""
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda _: None)
+    route = respx.post(f"{BASE_URL}/v1/sessions").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "0"}, json={}),
+            httpx.Response(200, json=SESSION_CREATE_PAYLOAD),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.create_session(context="checkout")
+    assert route.call_count == 2
+    assert result == SESSION_CREATE_PAYLOAD
+    client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_acreate_session_retries_once_on_429_then_succeeds(monkeypatch):
+    """Async mirror: `acreate_session` uses `_send_async`, exercising its 429 retry branch."""
+
+    async def _no_sleep(_seconds: float) -> None:
+        return None
+
+    monkeypatch.setattr("agentscore.client.asyncio.sleep", _no_sleep)
+    route = respx.post(f"{BASE_URL}/v1/sessions").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "0"}, json={}),
+            httpx.Response(200, json=SESSION_CREATE_PAYLOAD),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = await client.acreate_session(context="checkout")
+    assert route.call_count == 2
+    assert result == SESSION_CREATE_PAYLOAD
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: async non-timeout httpx.HTTPError wraps to network_error
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_connect_error_wraps_to_network_error():
+    """Async `_do_async`: a non-timeout httpx.HTTPError (ConnectError) becomes a generic
+    AgentScoreError(code='network_error', status_code=0), mirroring the sync path."""
+    respx.post(f"{BASE_URL}/v1/assess").mock(side_effect=httpx.ConnectError("dns down"))
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        await client.aassess(address=ADDRESS)
+    assert exc_info.value.code == "network_error"
+    assert exc_info.value.status_code == 0
+    # Not the typed TimeoutError subclass.
+    from agentscore.errors import TimeoutError as AgentScoreTimeoutError
+
+    assert not isinstance(exc_info.value, AgentScoreTimeoutError)
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: _build_error_from_response body-shape branches
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_error_body_non_dict_json_falls_through_to_defaults():
+    """When the error body parses to JSON that is NOT a dict (e.g. a list), the SDK keeps
+    code='unknown_error' and message=response.text rather than crashing."""
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(500, json=["oops", "not", "a", "dict"]),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.assess(address=ADDRESS)
+    err = exc_info.value
+    assert type(err) is AgentScoreError
+    assert err.code == "unknown_error"
+    assert err.status_code == 500
+    client.close()
+
+
+@respx.mock
+def test_error_body_error_field_not_dict_keeps_defaults():
+    """When `error` is present but not a dict (e.g. a string), code/message extraction is
+    skipped but the rest of the body is still preserved into `details`."""
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(
+            500,
+            json={"error": "a bare string, not an object", "request_id": "req_123"},
+        ),
+    )
+    client = AgentScore(api_key=API_KEY)
+    with pytest.raises(AgentScoreError) as exc_info:
+        client.assess(address=ADDRESS)
+    err = exc_info.value
+    assert err.code == "unknown_error"
+    assert err.status_code == 500
+    # Everything except the `error` block is preserved.
+    assert err.details == {"request_id": "req_123"}
+    client.close()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: sync client reuse (cached _sync_client)
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_sync_client_is_reused_across_calls():
+    """The second call must reuse the cached httpx.Client instance (the `is not None`
+    branch of `_get_sync_client`)."""
+    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.get_reputation(ADDRESS)
+    first = client._sync_client
+    assert first is not None
+    client.get_reputation(ADDRESS)
+    assert client._sync_client is first
+    client.close()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: aget_reputation chain param + aassess optional-arg branches
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aget_reputation_with_chain():
+    route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    await client.aget_reputation(ADDRESS, chain="base")
+    assert "chain=base" in str(route.calls.last.request.url)
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_forwards_chain_refresh_and_policy():
+    """Covers the `chain`, `refresh`, and `policy` body-building branches of `aassess`."""
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.aassess(
+        address=ADDRESS,
+        chain="base",
+        refresh=False,
+        policy={"min_score": 50},
+    )
+    body = json.loads(route.calls.last.request.content)
+    assert body["chain"] == "base"
+    assert body["refresh"] is False
+    assert body["policy"] == {"min_score": 50}
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: acreate_credential optional-arg branches (label / ttl_days None)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_acreate_credential_omits_unset_fields():
+    """Both `label` and `ttl_days` default to None — the body must stay empty (covers the
+    falsy side of both `is not None` branches)."""
+    route = respx.post(f"{BASE_URL}/v1/credentials").mock(
+        return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    await client.acreate_credential()
+    body = json.loads(route.calls.last.request.content)
+    assert body == {}
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_acreate_credential_forwards_label_and_ttl():
+    """Truthy side of both branches — label and ttl_days are forwarded."""
+    route = respx.post(f"{BASE_URL}/v1/credentials").mock(
+        return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD)
+    )
+    client = AgentScore(api_key=API_KEY)
+    await client.acreate_credential(label="ci", ttl_days=30)
+    body = json.loads(route.calls.last.request.content)
+    assert body == {"label": "ci", "ttl_days": 30}
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: idempotency_key over-length warning (sync + async)
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_associate_wallet_warns_on_overlong_idempotency_key(caplog):
+    from agentscore.client import _IDEMPOTENCY_KEY_MAX
+
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"ok": True, "first_seen": True})
+    )
+    client = AgentScore(api_key=API_KEY)
+    long_key = "k" * (_IDEMPOTENCY_KEY_MAX + 1)
+    with caplog.at_level("WARNING", logger="agentscore"):
+        client.associate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key=long_key)
+    assert any("truncated server-side" in r.message for r in caplog.records)
+    # Over-length key is still forwarded (server truncates, doesn't reject).
+    body = json.loads(route.calls.last.request.content)
+    assert body["idempotency_key"] == long_key
+    client.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassociate_wallet_warns_on_overlong_idempotency_key(caplog):
+    from agentscore.client import _IDEMPOTENCY_KEY_MAX
+
+    route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
+        return_value=httpx.Response(200, json={"ok": True, "first_seen": True})
+    )
+    client = AgentScore(api_key=API_KEY)
+    long_key = "k" * (_IDEMPOTENCY_KEY_MAX + 1)
+    with caplog.at_level("WARNING", logger="agentscore"):
+        await client.aassociate_wallet(ASSOCIATE_TOKEN, ASSOCIATE_WALLET, ASSOCIATE_NETWORK, idempotency_key=long_key)
+    assert any("truncated server-side" in r.message for r in caplog.records)
+    body = json.loads(route.calls.last.request.content)
+    assert body["idempotency_key"] == long_key
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: sync telemetry swallows raised exceptions (not just 5xx responses)
+# ---------------------------------------------------------------------------
+
+
+@respx.mock
+def test_telemetry_signer_match_swallows_raised_exception(caplog):
+    """A transport-layer exception (ConnectError) must be caught and logged, not raised,
+    by the sync telemetry method (its `except Exception` handler)."""
+    respx.post(f"{BASE_URL}/v1/telemetry/signer-match").mock(side_effect=httpx.ConnectError("dns down"))
+    client = AgentScore(api_key=API_KEY)
+    with caplog.at_level("WARNING", logger="agentscore"):
+        client.telemetry_signer_match({"kind": "pass"})  # must not raise
+    assert any("telemetry_signer_match failed" in r.message for r in caplog.records)
+    client.close()
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: _extract_quota defensive guard for headers without .get
+# ---------------------------------------------------------------------------
+
+
+def test_extract_quota_returns_none_when_headers_lack_get():
+    """Defensive guard: if a response object exposes `.headers` without a `.get` method,
+    `_extract_quota` returns None rather than raising."""
+    from agentscore.client import _extract_quota
+
+    class _NoGetHeaders:
+        pass
+
+    class _FakeResponse:
+        headers = _NoGetHeaders()
+
+    assert _extract_quota(_FakeResponse()) is None  # type: ignore[arg-type]

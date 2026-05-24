@@ -41,6 +41,12 @@ def test_details_defaults_to_empty_dict_when_omitted():
     assert err.details == {}
 
 
+def test_status_property_aliases_status_code():
+    err = AgentScoreError(code="rate_limited", message="Too many requests", status_code=429)
+    assert err.status == 429
+    assert err.status == err.status_code
+
+
 def test_details_preserves_response_body_fields_for_granular_recovery():
     err = AgentScoreError(
         code="wallet_signer_mismatch",
