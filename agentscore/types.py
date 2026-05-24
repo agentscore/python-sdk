@@ -322,6 +322,8 @@ class AssessResponse(_AssessResponseRequired, total=False):
 class SessionCreateRequest(TypedDict, total=False):
     context: str
     product_name: str
+    address: str
+    operator_token: str
 
 
 class SessionCreateNextSteps(TypedDict, total=False):
@@ -407,7 +409,11 @@ class AccountVerification(TypedDict, total=False):
     jurisdiction: str | None
     age_verified: bool
     age_bracket: str | None
-    sanctions_status: str | None
+    # `True` only when screened AND within the freshness window; `False` when on a
+    # sanctions list; `None` when never screened or stale.
+    sanctions_clear: bool | None
+    # ISO-8601 timestamp of the last sanctions screening, or `None` if never screened.
+    sanctions_checked_at: str | None
     operator_type: str | None
 
 
@@ -421,11 +427,9 @@ class CredentialRevokeResponse(TypedDict):
     revoked: Literal[True]
 
 
-class _CredentialCreateErrorNextSteps(TypedDict):
+class CredentialCreateErrorNextSteps(TypedDict):
+    # The API always emits both fields on the 409 KYC-required body, so both are required.
     action: NextStepsAction
-
-
-class CredentialCreateErrorNextSteps(_CredentialCreateErrorNextSteps, total=False):
     user_message: str
 
 
