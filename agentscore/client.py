@@ -93,7 +93,9 @@ def _build_error_from_response(response: httpx.Response) -> AgentScoreError:
     dedicated subclass for.
     """
     code = "unknown_error"
-    message = response.text
+    # Concise default, overridden by ``error.message`` when the body carries one. The raw
+    # body, when it is JSON, is preserved in ``details`` below.
+    message = f"Request failed with status {response.status_code}"
     details: dict[str, Any] = {}
 
     try:

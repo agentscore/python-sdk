@@ -2219,7 +2219,7 @@ async def test_aassess_connect_error_wraps_to_network_error():
 @respx.mock
 def test_error_body_non_dict_json_falls_through_to_defaults():
     """When the error body parses to JSON that is NOT a dict (e.g. a list), the SDK keeps
-    code='unknown_error' and message=response.text rather than crashing."""
+    code='unknown_error' and a status-based default message rather than crashing."""
     respx.post(f"{BASE_URL}/v1/assess").mock(
         return_value=httpx.Response(500, json=["oops", "not", "a", "dict"]),
     )
