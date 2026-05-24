@@ -211,7 +211,7 @@ except QuotaExceededError as e:
 except AgentScoreTimeoutError:
     print("Network timeout — retry with backoff.")
 except AgentScoreError as e:
-    print(e.code, e.message)
+    print(e.code, str(e))
 ```
 
 ## Quota observability
