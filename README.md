@@ -161,7 +161,7 @@ with AgentScore(api_key="as_live_...") as client:
 
 | Parameter     | Default                     | Description              |
 |---------------|-----------------------------|--------------------------|
-| `api_key`     | `None`                      | API key from [agentscore.sh](https://agentscore.sh) |
+| `api_key`     | _(required)_                | API key from [agentscore.sh](https://agentscore.sh); raises `ValueError` if missing |
 | `base_url`    | `https://api.agentscore.sh` | API base URL             |
 | `timeout`     | `10.0`                      | Request timeout (seconds)|
 | `user_agent`  | `None`                      | Prepended to the default `User-Agent` as `"{user_agent} (agentscore-py/{version})"`. Use to attribute API calls to your app. |
