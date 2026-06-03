@@ -151,12 +151,12 @@ class AgentScore:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.agentscore.sh",
+        base_url: str = "https://api.agentscore.com",
         timeout: float = 10.0,
         user_agent: str | None = None,
     ):
         if not api_key:
-            raise ValueError("AgentScore API key is required. Get one at https://agentscore.sh/sign-up")
+            raise ValueError("AgentScore API key is required. Get one at https://agentscore.com/sign-up")
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout

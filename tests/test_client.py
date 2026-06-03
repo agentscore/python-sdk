@@ -7,7 +7,7 @@ import respx
 from agentscore import AgentScore
 from agentscore.errors import AgentScoreError
 
-BASE_URL = "https://api.agentscore.sh"
+BASE_URL = "https://api.agentscore.com"
 API_KEY = "test-api-key"
 
 ADDRESS = "0xabc123"
@@ -39,8 +39,8 @@ def test_constructor_default_base_url():
 
 
 def test_constructor_custom_base_url():
-    client = AgentScore(api_key=API_KEY, base_url="https://staging.agentscore.sh/")
-    assert client.base_url == "https://staging.agentscore.sh"
+    client = AgentScore(api_key=API_KEY, base_url="https://staging.agentscore.com/")
+    assert client.base_url == "https://staging.agentscore.com"
 
 
 def test_constructor_custom_timeout():
@@ -671,7 +671,7 @@ ASSESS_WITH_COMPLIANCE = {
         "claimed_at": None,
         "verified_at": None,
     },
-    "verify_url": "https://agentscore.sh/verify/abc123",
+    "verify_url": "https://agentscore.com/verify/abc123",
     "resolved_operator": "0xoperator456",
 }
 
@@ -708,7 +708,7 @@ def test_assess_returns_verify_url():
     respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE))
     client = AgentScore(api_key=API_KEY)
     result = client.assess(ADDRESS)
-    assert result["verify_url"] == "https://agentscore.sh/verify/abc123"
+    assert result["verify_url"] == "https://agentscore.com/verify/abc123"
 
 
 @respx.mock
@@ -766,7 +766,7 @@ async def test_aassess_returns_compliance_fields():
     client = AgentScore(api_key=API_KEY)
     result = await client.aassess(ADDRESS)
     assert result["operator_verification"]["level"] == "none"
-    assert result["verify_url"] == "https://agentscore.sh/verify/abc123"
+    assert result["verify_url"] == "https://agentscore.com/verify/abc123"
     assert result["resolved_operator"] == "0xoperator456"
     await client.aclose()
 
@@ -790,7 +790,7 @@ def test_full_compliance_deny_flow():
             "claimed_at": None,
             "verified_at": None,
         },
-        "verify_url": "https://agentscore.sh/verify/xyz789",
+        "verify_url": "https://agentscore.com/verify/xyz789",
     }
     route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=compliance_response))
     client = AgentScore(api_key=API_KEY)
@@ -804,7 +804,7 @@ def test_full_compliance_deny_flow():
     assert result["decision"] == "deny"
     assert "kyc_required" in result["decision_reasons"]
     assert "sanctions_flagged" in result["decision_reasons"]
-    assert result["verify_url"] == "https://agentscore.sh/verify/xyz789"
+    assert result["verify_url"] == "https://agentscore.com/verify/xyz789"
     assert result["operator_verification"]["level"] == "none"
 
     body = json.loads(route.calls.last.request.content)
@@ -901,7 +901,7 @@ async def test_aassess_address_only_backwards_compat():
 SESSION_CREATE_PAYLOAD = {
     "session_id": "ses_abc123",
     "poll_secret": "ps_secret456",
-    "poll_url": "https://api.agentscore.sh/v1/sessions/ses_abc123",
+    "poll_url": "https://api.agentscore.com/v1/sessions/ses_abc123",
 }
 
 
@@ -912,7 +912,7 @@ def test_create_session_success():
     result = client.create_session()
     assert result["session_id"] == "ses_abc123"
     assert result["poll_secret"] == "ps_secret456"
-    assert result["poll_url"] == "https://api.agentscore.sh/v1/sessions/ses_abc123"
+    assert result["poll_url"] == "https://api.agentscore.com/v1/sessions/ses_abc123"
 
 
 @respx.mock
@@ -1707,10 +1707,10 @@ def test_token_expired_error_exposes_parsed_body_fields():
             401,
             json={
                 "error": {"code": "token_expired", "message": "Operator token expired"},
-                "verify_url": "https://agentscore.sh/verify/abc",
+                "verify_url": "https://agentscore.com/verify/abc",
                 "session_id": "sess_123",
                 "poll_secret": "ps_456",
-                "poll_url": "https://api.agentscore.sh/v1/sessions/sess_123",
+                "poll_url": "https://api.agentscore.com/v1/sessions/sess_123",
                 "next_steps": {"action": "deliver_verify_url_and_poll"},
                 "agent_memory": {"pattern_summary": "remembered"},
             },
@@ -1722,10 +1722,10 @@ def test_token_expired_error_exposes_parsed_body_fields():
     err = exc_info.value
     assert err.code == "token_expired"
     assert err.status_code == 401
-    assert err.verify_url == "https://agentscore.sh/verify/abc"
+    assert err.verify_url == "https://agentscore.com/verify/abc"
     assert err.session_id == "sess_123"
     assert err.poll_secret == "ps_456"
-    assert err.poll_url == "https://api.agentscore.sh/v1/sessions/sess_123"
+    assert err.poll_url == "https://api.agentscore.com/v1/sessions/sess_123"
     assert err.next_steps == {"action": "deliver_verify_url_and_poll"}
     assert err.agent_memory == {"pattern_summary": "remembered"}
     client.close()

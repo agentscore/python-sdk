@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/agentscore-py.svg)](https://pypi.org/project/agentscore-py/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Python client for the [AgentScore](https://agentscore.sh) APIs.
+Python client for the [AgentScore](https://agentscore.com) APIs.
 
 ## Install
 
@@ -161,8 +161,8 @@ with AgentScore(api_key="as_live_...") as client:
 
 | Parameter     | Default                     | Description              |
 |---------------|-----------------------------|--------------------------|
-| `api_key`     | _(required)_                | API key from [agentscore.sh](https://agentscore.sh); raises `ValueError` if missing |
-| `base_url`    | `https://api.agentscore.sh` | API base URL             |
+| `api_key`     | _(required)_                | API key from [agentscore.com](https://agentscore.com); raises `ValueError` if missing |
+| `base_url`    | `https://api.agentscore.com` | API base URL             |
 | `timeout`     | `10.0`                      | Request timeout (seconds)|
 | `user_agent`  | `None`                      | Prepended to the default `User-Agent` as `"{user_agent} (agentscore-py/{version})"`. Use to attribute API calls to your app. |
 
@@ -235,7 +235,7 @@ if quota and quota["limit"] and quota["used"]:
 
 ## Documentation
 
-- [API Reference](https://docs.agentscore.sh)
+- [API Reference](https://docs.agentscore.com)
 
 ## License
 
