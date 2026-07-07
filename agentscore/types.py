@@ -191,7 +191,7 @@ class SignerMatch(TypedDict):
     """Server-side wallet-signer-match verdict.
 
     Emitted on ``AssessResponse.signer_match`` when the request supplied
-    ``signer``. Mirrors the verdict shape commerce SDK gates produce locally;
+    ``signer``. Mirrors the verdict shape the gate produces locally;
     SDK consumers spread this into 403 bodies verbatim instead of re-deriving via 2
     extra ``/v1/assess`` round trips.
 
@@ -218,7 +218,7 @@ class SignerMatch(TypedDict):
     # Mirrors the top-level ``linked_wallets`` deny-guard — omitted on ``deny`` verdicts.
     linked_wallets: NotRequired[list[str]]
     # JSON-encoded ``{action, steps, user_message}`` envelope for SDK denial bodies.
-    # Authoritative copy lives server-side; SDK consumers spread this into their 403
+    # SDK consumers spread this into their 403
     # body without re-parsing.
     agent_instructions: NotRequired[str]
 
@@ -257,8 +257,7 @@ class SignerSanctionsUnavailable(TypedDict):
     """Server-side wallet-sanctions verdict — lookup itself failed.
 
     Fail-closed: the gate denies whenever a signer was supplied and the OFAC
-    lookup couldn't resolve. Falsely allowing a sanctioned settle is an OFAC
-    strict-liability violation; falsely denying a clean buyer is bad UX.
+    lookup couldn't resolve, because OFAC sanctions screening is strict-liability.
     """
 
     status: Literal["unavailable"]
@@ -268,10 +267,43 @@ class SignerSanctionsUnavailable(TypedDict):
 SignerSanctions = SignerSanctionsClear | SignerSanctionsHit | SignerSanctionsUnavailable
 
 
+class AipSignatureMaterial(TypedDict):
+    """RFC 9421 HTTP Message Signature material proving possession of the AIT-bound ``cnf`` key.
+
+    Forwarded alongside ``aip_token`` so ``/v1/assess`` can re-verify proof-of-possession
+    authoritatively; the API never sees the original agent-to-merchant request itself.
+    """
+
+    method: str  # HTTP method of the original agent-to-merchant request (``@method``)
+    authority: str  # Authority/host the agent signed (``@authority``)
+    path: str  # Request path the agent signed (``@path``)
+    signature_input: str  # Raw ``Signature-Input`` header value the agent sent
+    signature: str  # Raw ``Signature`` header value the agent sent
+
+
+class _AipProvenanceRequired(TypedDict):
+    issuer: str  # Canonical issuer URL of the AIT
+    subject: str  # The token's ``sub``: the IdP's subject identifier for the verified human
+
+
+class AipProvenance(_AipProvenanceRequired, total=False):
+    """Provenance block returned when the identity input was an AIP Agent Identity Token.
+
+    Surfaces which issuer attested the identity and the trust level it asserted.
+    """
+
+    trust_level: Literal["autonomous", "human_present", "human_confirmed"]
+    agent_provider: str
+    # True when /v1/assess re-verified the RFC 9421 proof-of-possession. Always true on a
+    # success response: the API fail-closes with an HTTP 400/401 error (not a 200 deny)
+    # when possession can't be proven.
+    pop_verified: bool
+
+
 class _AssessResponseRequired(TypedDict):
     decision: str | None
     decision_reasons: list[str]
-    identity_method: Literal["wallet", "operator_token"]
+    identity_method: Literal["wallet", "operator_token", "aip_token"]
 
 
 class PolicyExplanation(TypedDict, total=False):
@@ -314,6 +346,8 @@ class AssessResponse(_AssessResponseRequired, total=False):
     # Server-side OFAC SDN wallet-address verdict, returned only when the request supplied
     # ``signer``. Empty otherwise.
     signer_sanctions: NotRequired[SignerSanctions]
+    # Issuer provenance, returned only when ``identity_method == "aip_token"``.
+    aip: NotRequired[AipProvenance]
     # Quota state for this account, captured from response headers on the success path.
     # Use to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before 429.
     quota: NotRequired[QuotaInfo]
@@ -529,6 +563,7 @@ NextStepsAction = Literal[
 class AgentMemoryIdentityPaths(TypedDict):
     wallet: str
     operator_token: str
+    agent_identity: NotRequired[str]
 
 
 class AgentMemoryHint(TypedDict):
@@ -545,6 +580,8 @@ class AgentMemoryHint(TypedDict):
     identity_check_endpoint: str
     list_wallets_endpoint: NotRequired[str]
     identity_paths: AgentMemoryIdentityPaths
+    # Issuer allowlist a merchant accepts for AIP Agent Identity Tokens, when advertised.
+    aip_trusted_issuers: NotRequired[list[str]]
     bootstrap: str
     do_not_persist_in_memory: list[str]
     persist_in_credential_store: list[str]

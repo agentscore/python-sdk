@@ -7,7 +7,7 @@ import respx
 from agentscore import AgentScore
 from agentscore.errors import AgentScoreError
 
-BASE_URL = "https://api.agentscore.sh"
+BASE_URL = "https://api.agentscore.com"
 API_KEY = "test-api-key"
 
 ADDRESS = "0xabc123"
@@ -39,8 +39,8 @@ def test_constructor_default_base_url():
 
 
 def test_constructor_custom_base_url():
-    client = AgentScore(api_key=API_KEY, base_url="https://staging.agentscore.sh/")
-    assert client.base_url == "https://staging.agentscore.sh"
+    client = AgentScore(api_key=API_KEY, base_url="https://staging.agentscore.com/")
+    assert client.base_url == "https://staging.agentscore.com"
 
 
 def test_constructor_custom_timeout():
@@ -403,6 +403,107 @@ def test_assess_signer_raises_token_expired_with_signer():
 
 
 # ---------------------------------------------------------------------------
+# assess: AIP Agent Identity Token (aip_token + aip_signature)
+# ---------------------------------------------------------------------------
+
+AIP_TOKEN = "eyJhbGciOiJFZERTQSJ9.ait.payload"
+
+AIP_SIGNATURE = {
+    "method": "POST",
+    "authority": "merchant.example.com",
+    "path": "/premium/report",
+    "signature_input": 'sig1=("@method" "@authority" "@path");keyid="agent-cnf-key";alg="ed25519"',
+    "signature": "sig1=:dGVzdC1zaWduYXR1cmU=:",
+}
+
+AIP_ASSESS_PAYLOAD = {
+    **ASSESS_PAYLOAD,
+    "identity_method": "aip_token",
+    "aip": {
+        "issuer": "https://www.agentscore.com",
+        "subject": "user_2abc",
+        "trust_level": "human_present",
+        "agent_provider": "openai",
+        "pop_verified": True,
+    },
+}
+
+
+@respx.mock
+def test_assess_forwards_aip_token_and_signature_in_body():
+    """aip_token + all 5 RFC 9421 PoP fields of aip_signature land in the request body."""
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=AIP_ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(aip_token=AIP_TOKEN, aip_signature=AIP_SIGNATURE)
+    body = json.loads(route.calls.last.request.content)
+    assert body["aip_token"] == AIP_TOKEN
+    assert body["aip_signature"] == {
+        "method": "POST",
+        "authority": "merchant.example.com",
+        "path": "/premium/report",
+        "signature_input": 'sig1=("@method" "@authority" "@path");keyid="agent-cnf-key";alg="ed25519"',
+        "signature": "sig1=:dGVzdC1zaWduYXR1cmU=:",
+    }
+    assert "address" not in body
+    assert "operator_token" not in body
+
+
+@respx.mock
+def test_assess_returns_aip_provenance():
+    """The aip block (incl. pop_verified) and identity_method round-trip on the response."""
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=AIP_ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(aip_token=AIP_TOKEN, aip_signature=AIP_SIGNATURE)
+    assert result["identity_method"] == "aip_token"
+    assert result["aip"]["issuer"] == "https://www.agentscore.com"
+    assert result["aip"]["subject"] == "user_2abc"
+    assert result["aip"]["trust_level"] == "human_present"
+    assert result["aip"]["agent_provider"] == "openai"
+    assert result["aip"]["pop_verified"] is True
+
+
+@respx.mock
+def test_assess_omits_aip_fields_when_not_provided():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    client.assess(ADDRESS)
+    body = json.loads(route.calls.last.request.content)
+    assert "aip_token" not in body
+    assert "aip_signature" not in body
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_forwards_aip_token_and_signature_in_body():
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=AIP_ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    await client.aassess(aip_token=AIP_TOKEN, aip_signature=AIP_SIGNATURE)
+    body = json.loads(route.calls.last.request.content)
+    assert body["aip_token"] == AIP_TOKEN
+    assert body["aip_signature"] == {
+        "method": "POST",
+        "authority": "merchant.example.com",
+        "path": "/premium/report",
+        "signature_input": 'sig1=("@method" "@authority" "@path");keyid="agent-cnf-key";alg="ed25519"',
+        "signature": "sig1=:dGVzdC1zaWduYXR1cmU=:",
+    }
+    assert "address" not in body
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_aassess_returns_aip_provenance():
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=AIP_ASSESS_PAYLOAD))
+    client = AgentScore(api_key=API_KEY)
+    result = await client.aassess(aip_token=AIP_TOKEN, aip_signature=AIP_SIGNATURE)
+    assert result["identity_method"] == "aip_token"
+    assert result["aip"]["pop_verified"] is True
+    assert result["aip"]["issuer"] == "https://www.agentscore.com"
+    await client.aclose()
+
+
+# ---------------------------------------------------------------------------
 # Async: aget_reputation
 # ---------------------------------------------------------------------------
 
@@ -671,7 +772,7 @@ ASSESS_WITH_COMPLIANCE = {
         "claimed_at": None,
         "verified_at": None,
     },
-    "verify_url": "https://agentscore.sh/verify/abc123",
+    "verify_url": "https://www.agentscore.com/verify/abc123",
     "resolved_operator": "0xoperator456",
 }
 
@@ -708,7 +809,7 @@ def test_assess_returns_verify_url():
     respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE))
     client = AgentScore(api_key=API_KEY)
     result = client.assess(ADDRESS)
-    assert result["verify_url"] == "https://agentscore.sh/verify/abc123"
+    assert result["verify_url"] == "https://www.agentscore.com/verify/abc123"
 
 
 @respx.mock
@@ -766,7 +867,7 @@ async def test_aassess_returns_compliance_fields():
     client = AgentScore(api_key=API_KEY)
     result = await client.aassess(ADDRESS)
     assert result["operator_verification"]["level"] == "none"
-    assert result["verify_url"] == "https://agentscore.sh/verify/abc123"
+    assert result["verify_url"] == "https://www.agentscore.com/verify/abc123"
     assert result["resolved_operator"] == "0xoperator456"
     await client.aclose()
 
@@ -790,7 +891,7 @@ def test_full_compliance_deny_flow():
             "claimed_at": None,
             "verified_at": None,
         },
-        "verify_url": "https://agentscore.sh/verify/xyz789",
+        "verify_url": "https://www.agentscore.com/verify/xyz789",
     }
     route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=compliance_response))
     client = AgentScore(api_key=API_KEY)
@@ -804,7 +905,7 @@ def test_full_compliance_deny_flow():
     assert result["decision"] == "deny"
     assert "kyc_required" in result["decision_reasons"]
     assert "sanctions_flagged" in result["decision_reasons"]
-    assert result["verify_url"] == "https://agentscore.sh/verify/xyz789"
+    assert result["verify_url"] == "https://www.agentscore.com/verify/xyz789"
     assert result["operator_verification"]["level"] == "none"
 
     body = json.loads(route.calls.last.request.content)
@@ -901,7 +1002,7 @@ async def test_aassess_address_only_backwards_compat():
 SESSION_CREATE_PAYLOAD = {
     "session_id": "ses_abc123",
     "poll_secret": "ps_secret456",
-    "poll_url": "https://api.agentscore.sh/v1/sessions/ses_abc123",
+    "poll_url": "https://api.agentscore.com/v1/sessions/ses_abc123",
 }
 
 
@@ -912,7 +1013,7 @@ def test_create_session_success():
     result = client.create_session()
     assert result["session_id"] == "ses_abc123"
     assert result["poll_secret"] == "ps_secret456"
-    assert result["poll_url"] == "https://api.agentscore.sh/v1/sessions/ses_abc123"
+    assert result["poll_url"] == "https://api.agentscore.com/v1/sessions/ses_abc123"
 
 
 @respx.mock
@@ -1636,6 +1737,28 @@ def test_assess_caps_retry_wait_at_10_seconds(monkeypatch):
     client.close()
 
 
+@respx.mock
+def test_assess_negative_retry_after_does_not_crash_retry(monkeypatch):
+    # Regression: a negative Retry-After header used to reach time.sleep(-n) and
+    # raise ValueError, crashing the 429 retry. The wait must clamp to a
+    # non-negative value (0) and the retry must complete cleanly.
+    captured: list[float] = []
+    monkeypatch.setattr("agentscore.client.time.sleep", lambda s: captured.append(s))
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(
+        side_effect=[
+            httpx.Response(429, headers={"retry-after": "-5"}, json={}),
+            httpx.Response(200, json={"address": ADDRESS, "decision": "allow"}),
+        ],
+    )
+    client = AgentScore(api_key=API_KEY)
+    result = client.assess(address=ADDRESS)
+    assert route.call_count == 2
+    assert result["decision"] == "allow"
+    assert captured == [0.0]
+    assert captured[0] >= 0.0
+    client.close()
+
+
 @pytest.mark.asyncio
 @respx.mock
 async def test_aassess_retries_once_on_429_then_succeeds(monkeypatch):
@@ -1707,10 +1830,10 @@ def test_token_expired_error_exposes_parsed_body_fields():
             401,
             json={
                 "error": {"code": "token_expired", "message": "Operator token expired"},
-                "verify_url": "https://agentscore.sh/verify/abc",
+                "verify_url": "https://www.agentscore.com/verify/abc",
                 "session_id": "sess_123",
                 "poll_secret": "ps_456",
-                "poll_url": "https://api.agentscore.sh/v1/sessions/sess_123",
+                "poll_url": "https://api.agentscore.com/v1/sessions/sess_123",
                 "next_steps": {"action": "deliver_verify_url_and_poll"},
                 "agent_memory": {"pattern_summary": "remembered"},
             },
@@ -1722,10 +1845,10 @@ def test_token_expired_error_exposes_parsed_body_fields():
     err = exc_info.value
     assert err.code == "token_expired"
     assert err.status_code == 401
-    assert err.verify_url == "https://agentscore.sh/verify/abc"
+    assert err.verify_url == "https://www.agentscore.com/verify/abc"
     assert err.session_id == "sess_123"
     assert err.poll_secret == "ps_456"
-    assert err.poll_url == "https://api.agentscore.sh/v1/sessions/sess_123"
+    assert err.poll_url == "https://api.agentscore.com/v1/sessions/sess_123"
     assert err.next_steps == {"action": "deliver_verify_url_and_poll"}
     assert err.agent_memory == {"pattern_summary": "remembered"}
     client.close()
@@ -1960,6 +2083,17 @@ def test_retry_after_seconds_handles_invalid():
 
     fake_response = httpx.Response(429, headers={"retry-after": "not-a-number"})
     assert _retry_after_seconds(fake_response) == 1.0
+
+
+def test_retry_after_seconds_clamps_negative_to_zero():
+    # A buggy/malicious proxy sending a negative Retry-After must not produce a
+    # negative wait (which would raise ValueError at time.sleep). Clamp to 0.
+    from agentscore.client import _retry_after_seconds
+
+    fake_response = httpx.Response(429, headers={"retry-after": "-5"})
+    wait = _retry_after_seconds(fake_response)
+    assert wait == 0.0
+    assert wait >= 0.0
 
 
 def test_extract_quota_returns_none_when_no_headers():

@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/agentscore-py.svg)](https://pypi.org/project/agentscore-py/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Python client for the [AgentScore](https://agentscore.sh) APIs.
+The official Python client for [AgentScore](https://www.agentscore.com). Identity verification and compliance gating for agentic commerce (KYC, age, sanctions, jurisdiction), sync and async.
 
 ## Install
 
@@ -61,7 +61,7 @@ print(session["next_steps"]["action"])  # "deliver_verify_url_and_poll"
 
 status = client.poll_session(session["session_id"], session["poll_secret"])
 if status["status"] == "verified":
-    print(status["operator_token"])  # "opc_..." — use for future requests
+    print(status["operator_token"])  # "opc_...", use for future requests
 
 # Optional pre-association: attach the session to a known wallet or refresh KYC
 # for an existing operator credential.
@@ -71,7 +71,7 @@ client.create_session(operator_token="opc_...")  # KYC refresh
 
 ### Wallet resolution
 
-`assess()` responses include `resolved_operator` and `linked_wallets` — all same-operator sibling wallets (claimed via SIWE or captured via prior `associate_wallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `get_reputation()` accepts either format — network is auto-detected from the address shape.
+`assess()` responses include `resolved_operator` and `linked_wallets`, all same-operator sibling wallets (claimed via SIWE or captured via prior `associate_wallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `get_reputation()` accepts either format; the network is auto-detected from the address shape.
 
 ### Server-side signer-match + sanctions screening
 
@@ -101,9 +101,9 @@ if sanctions and sanctions.get("sanctioned"):
     print("OFAC hit:", sanctions["ofac_label"], sanctions["sdn_uid"])
 ```
 
-Wallet-OFAC SDN enforcement on the `signer` block is unconditional whenever a signer is supplied — no `policy.require_sanctions_clear` opt-in required. The API flips `decision` to `deny` when `signer_sanctions` is `sanctioned: True` OR `status: "unavailable"`, with `decision_reasons` including `sanctions_flagged` or `sanctions_check_unavailable` respectively (fail-closed; OFAC strict-liability). `policy.require_sanctions_clear` is the separate NAME-based screen on the resolved operator's KYC identity.
+Wallet-OFAC SDN enforcement on the `signer` block is unconditional whenever a signer is supplied; no `policy.require_sanctions_clear` opt-in is required. The API flips `decision` to `deny` when `signer_sanctions` is `sanctioned: True` OR `status: "unavailable"`, with `decision_reasons` including `sanctions_flagged` or `sanctions_check_unavailable` respectively (fail-closed; OFAC strict-liability). `policy.require_sanctions_clear` is the separate NAME-based screen on the resolved operator's KYC identity.
 
-Pass `signer["address"] = None` for rails without a wallet signer (Stripe SPT, card-only). The API responds with `signer_match["kind"] == "wallet_auth_requires_wallet_signing"` and a parsed `agent_instructions` block telling the agent to switch to `X-Operator-Token` auth — spread the block directly into a 403 body.
+Pass `signer["address"] = None` for rails without a wallet signer (Stripe SPT, card-only). The API responds with `signer_match["kind"] == "wallet_auth_requires_wallet_signing"` and a parsed `agent_instructions` block telling the agent to switch to `X-Operator-Token` auth, spread the block directly into a 403 body.
 
 ### Credential Management
 
@@ -117,14 +117,14 @@ client.revoke_credential(cred["id"])
 
 ### Report an Agent's Wallet (Cross-Merchant Attribution)
 
-After an agent authenticated via `operator_token` completes a payment, report the signer wallet so AgentScore can build a cross-merchant credential↔wallet profile. Fire-and-forget — `first_seen` is informational only. `network` is the key-derivation family: `"evm"` for any EVM chain (Base, Tempo, Ethereum, …) or `"solana"` for Solana.
+After an agent authenticated via `operator_token` completes a payment, report the signer wallet so AgentScore can build a cross-merchant credential↔wallet profile. Fire-and-forget, `first_seen` is informational only. `network` is the key-derivation family: `"evm"` for any EVM chain (Base, Tempo, Ethereum, …) or `"solana"` for Solana.
 
 ```python
 client.associate_wallet(
     operator_token="opc_...",
     wallet_address=signer_from_payment,  # e.g. EIP-3009 `from` or Tempo MPP DID address
     network="evm",
-    idempotency_key=payment_intent_id,  # optional — agent retries of the same payment no-op
+    idempotency_key=payment_intent_id,  # optional, agent retries of the same payment no-op
 )
 ```
 
@@ -161,8 +161,8 @@ with AgentScore(api_key="as_live_...") as client:
 
 | Parameter     | Default                     | Description              |
 |---------------|-----------------------------|--------------------------|
-| `api_key`     | _(required)_                | API key from [agentscore.sh](https://agentscore.sh); raises `ValueError` if missing |
-| `base_url`    | `https://api.agentscore.sh` | API base URL             |
+| `api_key`     | _(required)_                | API key from [agentscore.com](https://www.agentscore.com); raises `ValueError` if missing |
+| `base_url`    | `https://api.agentscore.com` | API base URL             |
 | `timeout`     | `10.0`                      | Request timeout (seconds)|
 | `user_agent`  | `None`                      | Prepended to the default `User-Agent` as `"{user_agent} (agentscore-py/{version})"`. Use to attribute API calls to your app. |
 
@@ -179,7 +179,7 @@ except AgentScoreError as e:
     print(e.code, e.status_code, str(e))
 ```
 
-`AgentScoreError.details` carries the rest of the response body — `verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory` — so callers can branch on granular denial codes without re-parsing.
+`AgentScoreError.details` carries the rest of the response body (`verify_url`, `linked_wallets`, `claimed_operator`, `actual_signer`, `expected_signer`, `reasons`, `agent_memory`) so callers can branch on granular denial codes without re-parsing.
 
 ### Typed error classes
 
@@ -188,11 +188,11 @@ For status-code-specific recovery, the SDK raises typed subclasses of `AgentScor
 | Class | Triggered by | What it adds |
 |---|---|---|
 | `PaymentRequiredError` | HTTP 402 | The endpoint is not enabled for this account |
-| `TokenExpiredError` | HTTP 401 with `error.code = "token_expired"` | Parsed body fields on the instance: `verify_url`, `session_id`, `poll_secret`, `poll_url`, `next_steps`, `agent_memory` — recover without re-parsing `details` |
-| `InvalidCredentialError` | HTTP 401 with `error.code = "invalid_credential"` | Permanent — switch tokens or restart |
+| `TokenExpiredError` | HTTP 401 with `error.code = "token_expired"` | Parsed body fields on the instance: `verify_url`, `session_id`, `poll_secret`, `poll_url`, `next_steps`, `agent_memory`, recover without re-parsing `details` |
+| `InvalidCredentialError` | HTTP 401 with `error.code = "invalid_credential"` | Permanent, switch tokens or restart |
 | `QuotaExceededError` | HTTP 429 with `error.code = "quota_exceeded"` | Account-level cap reached; don't retry |
 | `RateLimitedError` | HTTP 429 with `error.code = "rate_limited"` | Per-second sliding-window cap; retry after `Retry-After` |
-| `TimeoutError` | `httpx.TimeoutException` (connect/read/write/pool timeout) | Distinct from generic network errors. Note: subclasses `AgentScoreError`, **not** the builtin `TimeoutError` — import explicitly from `agentscore.errors` to disambiguate. |
+| `TimeoutError` | `httpx.TimeoutException` (connect/read/write/pool timeout) | Distinct from generic network errors. Note: subclasses `AgentScoreError`, **not** the builtin `TimeoutError`, import explicitly from `agentscore.errors` to disambiguate. |
 
 All non-timeout `httpx.HTTPError` (ConnectError, ProtocolError, NetworkError, etc.) are wrapped as `AgentScoreError(code="network_error", status_code=0)`.
 
@@ -207,9 +207,9 @@ try:
 except TokenExpiredError as e:
     print("Verify at:", e.verify_url, "poll with:", e.poll_secret)
 except QuotaExceededError as e:
-    print("Account quota reached — surface to user; don't retry.")
+    print("Account quota reached, surface to user; don't retry.")
 except AgentScoreTimeoutError:
-    print("Network timeout — retry with backoff.")
+    print("Network timeout, retry with backoff.")
 except AgentScoreError as e:
     print(e.code, str(e))
 ```
@@ -224,10 +224,10 @@ quota = result.get("quota")
 if quota and quota["limit"] and quota["used"]:
     pct = (quota["used"] / quota["limit"]) * 100
     if pct > 80:
-        print(f"AgentScore quota at {pct:.1f}% — resets {quota['reset']}")
+        print(f"AgentScore quota at {pct:.1f}%, resets {quota['reset']}")
 ```
 
-`quota` is absent when the API doesn't emit the headers (Enterprise / unlimited tiers). On a 429 response the SDK raises `QuotaExceededError` / `RateLimitedError` instead of returning a body, so `quota` is only readable on successful calls — drive proactive alerting off the success-path field.
+`quota` is absent when the API doesn't emit the headers (Enterprise / unlimited tiers). On a 429 response the SDK raises `QuotaExceededError` / `RateLimitedError` instead of returning a body, so `quota` is only readable on successful calls; drive proactive alerting off the success-path field.
 
 ## Telemetry
 
@@ -235,7 +235,7 @@ if quota and quota["limit"] and quota["used"]:
 
 ## Documentation
 
-- [API Reference](https://docs.agentscore.sh)
+- [API Reference](https://docs.agentscore.com)
 
 ## License
 
