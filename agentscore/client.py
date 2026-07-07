@@ -27,7 +27,9 @@ _MAX_RETRY_WAIT_SECONDS = 10.0
 def _retry_after_seconds(response: httpx.Response) -> float:
     raw = response.headers.get("retry-after", "1")
     try:
-        return min(float(raw), _MAX_RETRY_WAIT_SECONDS)
+        # Clamp the lower bound to 0: a negative ``Retry-After`` (buggy/malicious proxy)
+        # would otherwise reach ``time.sleep(-n)`` and raise ValueError, crashing the retry.
+        return max(0.0, min(float(raw), _MAX_RETRY_WAIT_SECONDS))
     except (TypeError, ValueError):
         return 1.0
 
@@ -131,6 +133,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from agentscore.types import (
+        AipSignatureMaterial,
         AssessResponse,
         AssociateWalletResponse,
         CredentialCreateResponse,
@@ -151,12 +154,12 @@ class AgentScore:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.agentscore.sh",
+        base_url: str = "https://api.agentscore.com",
         timeout: float = 10.0,
         user_agent: str | None = None,
     ):
         if not api_key:
-            raise ValueError("AgentScore API key is required. Get one at https://agentscore.sh/sign-up")
+            raise ValueError("AgentScore API key is required. Get one at https://www.agentscore.com/sign-up")
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
@@ -260,18 +263,30 @@ class AgentScore:
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
         signer: Signer | None = None,
+        aip_token: str | None = None,
+        aip_signature: AipSignatureMaterial | None = None,
     ) -> AssessResponse:
         """Assess a wallet or operator (paid, writes score on-the-fly).
 
         ``signer`` opts into server-side wallet-signer-match: when supplied,
         the API resolves the signer wallet against the claimed ``address`` and emits
         a ``signer_match`` block on the response. See :class:`Signer`.
+
+        ``aip_token`` (+ ``aip_signature``) supplies an AIP Agent Identity Token in place of
+        ``address`` / ``operator_token``: the API re-verifies the issuer signature, the RFC 9421
+        proof-of-possession, and the attested claims, then evaluates policy against them.
         """
         body: dict[str, Any] = {}
         if address:
             body["address"] = address
         if operator_token:
             body["operator_token"] = operator_token
+        # AIP Agent Identity Token path: the API re-verifies the IdP signature + claims
+        # server-side and evaluates policy against the attested identity.
+        if aip_token:
+            body["aip_token"] = aip_token
+        if aip_signature is not None:
+            body["aip_signature"] = dict(aip_signature)
         if chain:
             body["chain"] = chain
         if refresh is not None:
@@ -398,17 +413,23 @@ class AgentScore:
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
         signer: Signer | None = None,
+        aip_token: str | None = None,
+        aip_signature: AipSignatureMaterial | None = None,
     ) -> AssessResponse:
         """Assess a wallet or operator (paid, writes score on-the-fly).
 
-        ``signer`` opts into server-side wallet-signer-match — async mirror of
-        :meth:`assess`.
+        ``signer`` opts into server-side wallet-signer-match; ``aip_token`` (+ ``aip_signature``)
+        supplies an AIP Agent Identity Token. Async mirror of :meth:`assess`.
         """
         body: dict[str, Any] = {}
         if address:
             body["address"] = address
         if operator_token:
             body["operator_token"] = operator_token
+        if aip_token:
+            body["aip_token"] = aip_token
+        if aip_signature is not None:
+            body["aip_signature"] = dict(aip_signature)
         if chain:
             body["chain"] = chain
         if refresh is not None:

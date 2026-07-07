@@ -34,7 +34,7 @@ class PaymentRequiredError(AgentScoreError):
 class TokenExpiredError(AgentScoreError):
     """HTTP 401 with ``error.code = 'token_expired'`` — credential is no longer valid.
 
-    Covers both revoked and TTL-expired credentials; the API deliberately doesn't disclose
+    Covers both revoked and TTL-expired credentials; the API does not distinguish
     which. Body carries an auto-minted verification session — exposed here so callers recover
     without re-parsing ``details``.
     """
