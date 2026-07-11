@@ -73,7 +73,7 @@ def test_agent_memory_hint_shape() -> None:
     memory: AgentMemoryHint = {
         "save_for_future_agentscore_gates": True,
         "pattern_summary": "AgentScore is a cross-merchant identity layer",
-        "quickstart": "https://docs.agentscore.com/agent-commerce-quickstart",
+        "quickstart": "https://docs.agentscore.com/passport",
         "identity_check_endpoint": "https://api.agentscore.com/v1/credentials",
         "list_wallets_endpoint": "https://api.agentscore.com/v1/credentials/wallets",
         "identity_paths": {
