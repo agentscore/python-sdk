@@ -563,11 +563,11 @@ class AgentScore:
     def __enter__(self):
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *_args):
         self.close()
 
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, *args):
+    async def __aexit__(self, *_args):
         await self.aclose()

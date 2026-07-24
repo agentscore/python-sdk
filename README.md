@@ -26,15 +26,18 @@ print(rep["score"]["value"], rep["score"]["grade"])
 base_rep = client.get_reputation("0x1234...", chain="base")
 
 # Identity gate with policy (paid)
-gated = client.assess("0x1234...", policy={
-    "require_kyc": True,
-    "require_sanctions_clear": True,
-    "min_age": 21,
-})
+gated = client.assess(
+    "0x1234...",
+    policy={
+        "require_kyc": True,
+        "require_sanctions_clear": True,
+        "min_age": 21,
+    },
+)
 
 if gated["decision"] == "deny":
     print(gated["decision_reasons"])  # ["kyc_required"]
-    print(gated.get("verify_url"))    # URL for operator verification
+    print(gated.get("verify_url"))  # URL for operator verification
 
 # Check verification level
 rep = client.get_reputation("0x1234...")
@@ -198,7 +201,10 @@ All non-timeout `httpx.HTTPError` (ConnectError, ProtocolError, NetworkError, et
 
 ```python
 from agentscore import (
-    AgentScore, AgentScoreError, TokenExpiredError, QuotaExceededError,
+    AgentScore,
+    AgentScoreError,
+    TokenExpiredError,
+    QuotaExceededError,
 )
 from agentscore.errors import TimeoutError as AgentScoreTimeoutError
 
