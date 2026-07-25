@@ -1245,6 +1245,7 @@ CREDENTIAL_LIST_PAYLOAD = {
             "created_at": "2024-01-01T00:00:00Z",
             "expires_at": "2024-04-01T00:00:00Z",
             "last_used_at": None,
+            "refreshable": False,
         },
         {
             "id": "cred_def456",
@@ -1266,6 +1267,10 @@ def test_list_credentials_success():
     assert len(result["credentials"]) == 2
     assert result["credentials"][0]["id"] == "cred_abc123"
     assert result["credentials"][1]["id"] == "cred_def456"
+    assert result["credentials"][0]["refreshable"] is False
+    # Optional on the wire: a credential listed by an older API build carries no
+    # such key, and reading it must not raise.
+    assert result["credentials"][1].get("refreshable") is None
 
 
 @respx.mock

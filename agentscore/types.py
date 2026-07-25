@@ -420,6 +420,10 @@ class CredentialItem(TypedDict):
     created_at: str
     expires_at: str | None
     last_used_at: str | None
+    # True when a live refresh token can still mint a replacement for this
+    # credential. An expired credential is listed only while this holds, since
+    # revoking it is what stops the renewal.
+    refreshable: NotRequired[bool]
 
 
 class _CredentialCreateResponseRequired(TypedDict):
