@@ -29,7 +29,7 @@ jobs:
             ~/.local/share/uv
           key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
           restore-keys: ${{ runner.os }}-uv-
-      - run: uv sync --frozen --all-extras
+      - run: uv sync --frozen --all-extras --all-groups
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run ty check agentscore/
