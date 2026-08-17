@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@v10.0.1
       - run: uv python install 3.12
       - uses: actions/cache@v6
         with:
