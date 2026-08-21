@@ -56,3 +56,9 @@ include = ["agentscore"]
 
 [tool.uv]
 required-version = ">=0.11.0"
+# An unbounded transitive requirement lets a routine refresh resolve a BETA and
+# drag a subtree with it, and the tests pass either way, so nothing reports it.
+# That is how python-commerce once resolved web3 8.0.0b3 through three
+# unbounded parents. Blocking prereleases outright beats pinning whichever
+# package surfaced last, since the same shape exists on several transitives.
+prerelease = "disallow"
