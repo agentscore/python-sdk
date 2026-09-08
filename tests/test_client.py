@@ -1023,10 +1023,12 @@ def test_create_session_with_first_class_fields():
     client.create_session(
         context="wine purchase verification",
         product_name="Cabernet Reserve 2022",
+        kind="sign_in",
     )
     body = json.loads(route.calls.last.request.content)
     assert body["context"] == "wine purchase verification"
     assert body["product_name"] == "Cabernet Reserve 2022"
+    assert body["kind"] == "sign_in"
 
 
 @respx.mock
@@ -1037,6 +1039,7 @@ def test_create_session_omits_none_fields():
     body = json.loads(route.calls.last.request.content)
     assert "context" not in body
     assert "product_name" not in body
+    assert "kind" not in body
 
 
 @respx.mock

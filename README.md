@@ -70,6 +70,7 @@ if status["status"] == "verified":
 # for an existing operator credential.
 client.create_session(address="0x...")
 client.create_session(operator_token="opc_...")  # KYC refresh
+client.create_session(kind="sign_in")  # registration-only: account sign-in, no identity documents
 ```
 
 ### Wallet resolution

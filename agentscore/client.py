@@ -4,7 +4,7 @@ import asyncio
 import logging
 import time
 from importlib.metadata import version as _pkg_version
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 
@@ -308,12 +308,17 @@ class AgentScore:
         product_name: str | None = None,
         address: str | None = None,
         operator_token: str | None = None,
+        kind: Literal["kyc", "sign_in"] | None = None,
     ) -> SessionCreateResponse:
         """Create an assessment session for deferred scoring.
 
         ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
         Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
-        e.g. refresh KYC for a credential.
+        e.g. refresh KYC for a credential. ``kind`` selects the session kind: ``"kyc"``
+        (the API default) runs identity verification; ``"sign_in"`` is registration-only
+        (the buyer signs in with an AgentScore account, no identity documents) and mints a
+        ``sign_in``-scoped credential, for merchants that key durable state on the account
+        without any compliance policy.
         """
         body: dict[str, Any] = {}
         if context is not None:
@@ -324,6 +329,8 @@ class AgentScore:
             body["address"] = address
         if operator_token is not None:
             body["operator_token"] = operator_token
+        if kind is not None:
+            body["kind"] = kind
         client = self._get_sync_client()
         return self._send_sync(lambda: client.post("/v1/sessions", json=body))
 
@@ -451,12 +458,17 @@ class AgentScore:
         product_name: str | None = None,
         address: str | None = None,
         operator_token: str | None = None,
+        kind: Literal["kyc", "sign_in"] | None = None,
     ) -> SessionCreateResponse:
         """Create an assessment session for deferred scoring.
 
         ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
         Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
-        e.g. refresh KYC for a credential.
+        e.g. refresh KYC for a credential. ``kind`` selects the session kind: ``"kyc"``
+        (the API default) runs identity verification; ``"sign_in"`` is registration-only
+        (the buyer signs in with an AgentScore account, no identity documents) and mints a
+        ``sign_in``-scoped credential, for merchants that key durable state on the account
+        without any compliance policy.
         """
         body: dict[str, Any] = {}
         if context is not None:
@@ -467,6 +479,8 @@ class AgentScore:
             body["address"] = address
         if operator_token is not None:
             body["operator_token"] = operator_token
+        if kind is not None:
+            body["kind"] = kind
         client = self._get_async_client()
         return await self._send_async(lambda: client.post("/v1/sessions", json=body))
 
