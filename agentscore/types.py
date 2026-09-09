@@ -395,6 +395,8 @@ class _SessionCreateResponseRequired(TypedDict):
 
 
 class SessionCreateResponse(_SessionCreateResponseRequired, total=False):
+    # The kind the session was minted with; absent on older API responses.
+    kind: Literal["kyc", "sign_in"]
     # Structured next_steps with action=deliver_verify_url_and_poll.
     next_steps: SessionCreateNextSteps
     # Cross-merchant memory hint on first session creation.
