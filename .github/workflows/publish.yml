@@ -21,7 +21,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v10.1.0
         with:
-          version: "0.12.13"
+          version: "0.12.16"
 
       - name: Set version from tag
         run: sed -i "s/^version = .*/version = \"${GITHUB_REF_NAME#v}\"/" pyproject.toml
