@@ -141,7 +141,6 @@ if TYPE_CHECKING:
         CredentialRevokeResponse,
         DecisionPolicy,
         Network,
-        ReputationResponse,
         SessionCreateResponse,
         SessionPollResponse,
         Signer,
@@ -246,14 +245,6 @@ class AgentScore:
             ) from err
 
     # --- Sync methods ---
-
-    def get_reputation(self, address: str, chain: str | None = None) -> ReputationResponse:
-        """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
-        params: dict[str, str] = {}
-        if chain:
-            params["chain"] = chain
-        client = self._get_sync_client()
-        return self._send_sync(lambda: client.get(f"/v1/reputation/{address}", params=params))
 
     def assess(
         self,
@@ -403,14 +394,6 @@ class AgentScore:
         return self._send_sync(lambda: client.post("/v1/credentials/wallets", json=body))
 
     # --- Async methods ---
-
-    async def aget_reputation(self, address: str, chain: str | None = None) -> ReputationResponse:
-        """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
-        params: dict[str, str] = {}
-        if chain:
-            params["chain"] = chain
-        client = self._get_async_client()
-        return await self._send_async(lambda: client.get(f"/v1/reputation/{address}", params=params))
 
     async def aassess(
         self,

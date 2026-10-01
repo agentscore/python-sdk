@@ -54,95 +54,40 @@ def test_constructor_default_timeout():
 
 
 # ---------------------------------------------------------------------------
-# get_reputation
+# assess: error status codes
 # ---------------------------------------------------------------------------
 
-REPUTATION_PAYLOAD = {
-    "subject": {"chains": ["base"], "address": ADDRESS},
-    "score": {
-        "value": 75,
-        "grade": "B",
-        "scored_at": "2024-01-01T00:00:00Z",
-        "status": "scored",
-        "version": "1",
-    },
-    "chains": [
-        {
-            "chain": "base",
-            "score": {"value": 75, "grade": "B"},
-            "classification": {"entity_type": "wallet", "confidence": 0.9},
-            "identity": {},
-            "activity": {},
-            "evidence_summary": {},
-        },
-    ],
-    "data_semantics": "live",
-    "caveats": [],
-    "updated_at": "2024-01-01T00:00:00Z",
-}
-
 
 @respx.mock
-def test_get_reputation_success():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
-    client = AgentScore(api_key=API_KEY)
-    result = client.get_reputation(ADDRESS)
-    assert result["score"]["grade"] == "B"
-    assert result["subject"]["address"] == ADDRESS
-
-
-@respx.mock
-def test_get_reputation_no_chain_param():
-    route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
-    )
-    client = AgentScore(api_key=API_KEY)
-    client.get_reputation(ADDRESS)
-    assert "chain" not in str(route.calls.last.request.url)
-
-
-@respx.mock
-def test_get_reputation_with_chain():
-    route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
-    )
-    client = AgentScore(api_key=API_KEY)
-    client.get_reputation(ADDRESS, chain="base")
-    assert "chain=base" in str(route.calls.last.request.url)
-
-
-@respx.mock
-def test_get_reputation_raises_on_404():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+def test_assess_raises_on_404():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
         return_value=httpx.Response(404, json={"error": {"code": "not_found", "message": "Address not found"}})
     )
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     assert exc_info.value.status_code == 404
     assert exc_info.value.code == "not_found"
 
 
 @respx.mock
-def test_get_reputation_raises_on_401():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+def test_assess_raises_on_401():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
         return_value=httpx.Response(401, json={"error": {"code": "unauthorized", "message": "Invalid API key"}})
     )
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     assert exc_info.value.status_code == 401
     assert exc_info.value.code == "unauthorized"
 
 
 @respx.mock
-def test_get_reputation_raises_on_500_non_json():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(500, text="Internal Server Error")
-    )
+def test_assess_raises_on_500_non_json():
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(500, text="Internal Server Error"))
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     assert exc_info.value.status_code == 500
     assert exc_info.value.code == "unknown_error"
 
@@ -152,7 +97,6 @@ def test_get_reputation_raises_on_500_non_json():
 # ---------------------------------------------------------------------------
 
 ASSESS_PAYLOAD = {
-    **REPUTATION_PAYLOAD,
     "decision": "allow",
     "decision_reasons": [],
     "on_the_fly": True,
@@ -223,22 +167,12 @@ def test_assess_raises_on_402():
 # API key header
 # ---------------------------------------------------------------------------
 
-REPUTATION_PAYLOAD_SIMPLE = {
-    "subject": {"chains": ["base"], "address": ADDRESS},
-    "score": {"value": 75, "grade": "B", "scored_at": "2024-01-01T00:00:00Z", "status": "scored", "version": "1"},
-    "data_semantics": "live",
-    "caveats": [],
-    "updated_at": "2024-01-01T00:00:00Z",
-}
-
 
 @respx.mock
 def test_auth_header_is_sent():
-    route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD_SIMPLE)
-    )
+    route = respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key="my-secret-key")
-    client.get_reputation(ADDRESS)
+    client.assess(ADDRESS)
     assert route.calls.last.request.headers["x-api-key"] == "my-secret-key"
 
 
@@ -249,12 +183,10 @@ def test_auth_header_is_sent():
 
 @respx.mock
 def test_error_missing_error_key_falls_back():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(400, json={"message": "bad request"})
-    )
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(400, json={"message": "bad request"}))
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     assert exc_info.value.status_code == 400
     assert exc_info.value.code == "unknown_error"
 
@@ -504,30 +436,19 @@ async def test_aassess_returns_aip_provenance():
 
 
 # ---------------------------------------------------------------------------
-# Async: aget_reputation
+# Async: aassess errors
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_aget_reputation_success():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
-    client = AgentScore(api_key=API_KEY)
-    result = await client.aget_reputation(ADDRESS)
-    assert result["score"]["grade"] == "B"
-    assert result["subject"]["address"] == ADDRESS
-    await client.aclose()
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_aget_reputation_raises_on_error():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+async def test_aassess_raises_on_error():
+    respx.post(f"{BASE_URL}/v1/assess").mock(
         return_value=httpx.Response(404, json={"error": {"code": "not_found", "message": "Not found"}})
     )
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        await client.aget_reputation(ADDRESS)
+        await client.aassess(ADDRESS)
     assert exc_info.value.status_code == 404
     assert exc_info.value.code == "not_found"
     await client.aclose()
@@ -556,32 +477,32 @@ async def test_aassess_success():
 
 @respx.mock
 def test_sync_context_manager():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     with AgentScore(api_key=API_KEY) as client:
-        result = client.get_reputation(ADDRESS)
-        assert result["score"]["grade"] == "B"
+        result = client.assess(ADDRESS)
+        assert result["decision"] == "allow"
     assert client._sync_client is None
 
 
 @pytest.mark.asyncio
 @respx.mock
 async def test_async_context_manager():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     async with AgentScore(api_key=API_KEY) as client:
-        result = await client.aget_reputation(ADDRESS)
-        assert result["score"]["grade"] == "B"
+        result = await client.aassess(ADDRESS)
+        assert result["decision"] == "allow"
     assert client._async_client is None
 
 
 @respx.mock
 def test_success_response_with_invalid_json():
     """A 200 response with non-JSON body should raise AgentScoreError."""
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
+    respx.post(f"{BASE_URL}/v1/assess").mock(
         return_value=httpx.Response(200, text="not json"),
     )
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     assert exc_info.value.code == "invalid_response"
     assert exc_info.value.status_code == 200
 
@@ -606,11 +527,11 @@ def test_user_agent_header_includes_version():
     """User-Agent header should include package version."""
     from importlib.metadata import version
 
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD),
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_PAYLOAD),
     )
     client = AgentScore(api_key=API_KEY)
-    client.get_reputation(ADDRESS)
+    client.assess(ADDRESS)
     request = respx.calls[0].request
     assert request.headers["user-agent"] == f"agentscore-py/{version('agentscore-py')}"
 
@@ -620,11 +541,11 @@ def test_user_agent_header_prepends_custom_user_agent():
     """Custom user_agent should be rendered as '{custom} ({default})'."""
     from importlib.metadata import version
 
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD),
+    respx.post(f"{BASE_URL}/v1/assess").mock(
+        return_value=httpx.Response(200, json=ASSESS_PAYLOAD),
     )
     client = AgentScore(api_key=API_KEY, user_agent="my-app/1.2.3")
-    client.get_reputation(ADDRESS)
+    client.assess(ADDRESS)
     request = respx.calls[0].request
     expected = f"my-app/1.2.3 (agentscore-py/{version('agentscore-py')})"
     assert request.headers["user-agent"] == expected
@@ -658,9 +579,9 @@ def test_assess_refresh_omitted_when_default():
 
 @respx.mock
 def test_double_close():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
-    client.get_reputation(ADDRESS)
+    client.assess(ADDRESS)
     client.close()
     client.close()
     assert client._sync_client is None
@@ -669,9 +590,9 @@ def test_double_close():
 @pytest.mark.asyncio
 @respx.mock
 async def test_double_aclose():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
-    await client.aget_reputation(ADDRESS)
+    await client.aassess(ADDRESS)
     await client.aclose()
     await client.aclose()
     assert client._async_client is None
@@ -682,27 +603,17 @@ async def test_double_aclose():
 async def test_concurrent_async_calls():
     import asyncio
 
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
     results = await asyncio.gather(
-        client.aget_reputation(ADDRESS),
-        client.aget_reputation(ADDRESS),
-        client.aget_reputation(ADDRESS),
+        client.aassess(ADDRESS),
+        client.aassess(ADDRESS),
+        client.aassess(ADDRESS),
     )
     assert len(results) == 3
     for r in results:
-        assert r["score"]["grade"] == "B"
+        assert r["decision"] == "allow"
     await client.aclose()
-
-
-@respx.mock
-def test_empty_chain_string_not_included_in_params():
-    route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
-    )
-    client = AgentScore(api_key=API_KEY)
-    client.get_reputation(ADDRESS, chain="")
-    assert "chain" not in str(route.calls.last.request.url)
 
 
 @respx.mock
@@ -719,10 +630,10 @@ def test_assess_empty_policy_dict_included_in_body():
 def test_timeout_error_raises_agentscore_error():
     from agentscore.errors import TimeoutError as AgentScoreTimeoutError
 
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(side_effect=httpx.TimeoutException("timed out"))
+    respx.post(f"{BASE_URL}/v1/assess").mock(side_effect=httpx.TimeoutException("timed out"))
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreTimeoutError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     # TimeoutError subclasses AgentScoreError so existing `except AgentScoreError` blocks still catch it.
     assert isinstance(exc_info.value, AgentScoreError)
     assert exc_info.value.code == "timeout"
@@ -730,10 +641,10 @@ def test_timeout_error_raises_agentscore_error():
 
 @respx.mock
 def test_connect_error_raises_agentscore_error():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(side_effect=httpx.ConnectError("connection refused"))
+    respx.post(f"{BASE_URL}/v1/assess").mock(side_effect=httpx.ConnectError("connection refused"))
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     # All httpx-layer errors (Timeout, Connect, Protocol, Network) are wrapped — parity with node-sdk.
     # ConnectError specifically maps to network_error; TimeoutException is the only one that becomes TimeoutError.
     assert exc_info.value.code == "network_error"
@@ -742,12 +653,10 @@ def test_connect_error_raises_agentscore_error():
 
 @respx.mock
 def test_error_response_no_error_key_fallback():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(422, json={"detail": "validation failed"})
-    )
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(422, json={"detail": "validation failed"}))
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
-        client.get_reputation(ADDRESS)
+        client.assess(ADDRESS)
     assert exc_info.value.status_code == 422
     assert exc_info.value.code == "unknown_error"
 
@@ -756,11 +665,6 @@ def test_error_response_no_error_key_fallback():
 # Verification / Compliance fields
 # ---------------------------------------------------------------------------
 
-
-REPUTATION_WITH_VERIFICATION = {
-    **REPUTATION_PAYLOAD,
-    "verification_level": "kyc_verified",
-}
 
 ASSESS_WITH_COMPLIANCE = {
     **ASSESS_PAYLOAD,
@@ -775,24 +679,6 @@ ASSESS_WITH_COMPLIANCE = {
     "verify_url": "https://www.agentscore.com/verify/abc123",
     "resolved_operator": "0xoperator456",
 }
-
-
-@respx.mock
-def test_get_reputation_returns_verification_level():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_WITH_VERIFICATION)
-    )
-    client = AgentScore(api_key=API_KEY)
-    result = client.get_reputation(ADDRESS)
-    assert result["verification_level"] == "kyc_verified"
-
-
-@respx.mock
-def test_get_reputation_omits_verification_level_when_absent():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
-    client = AgentScore(api_key=API_KEY)
-    result = client.get_reputation(ADDRESS)
-    assert "verification_level" not in result
 
 
 @respx.mock
@@ -850,18 +736,6 @@ def test_assess_sends_compliance_policy_fields():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_aget_reputation_returns_verification_level():
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_WITH_VERIFICATION)
-    )
-    client = AgentScore(api_key=API_KEY)
-    result = await client.aget_reputation(ADDRESS)
-    assert result["verification_level"] == "kyc_verified"
-    await client.aclose()
-
-
-@pytest.mark.asyncio
-@respx.mock
 async def test_aassess_returns_compliance_fields():
     respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_WITH_COMPLIANCE))
     client = AgentScore(api_key=API_KEY)
@@ -881,7 +755,7 @@ async def test_aassess_returns_compliance_fields():
 def test_full_compliance_deny_flow():
     """Full assess flow with compliance policy returning deny + verify_url."""
     compliance_response = {
-        **REPUTATION_PAYLOAD,
+        **ASSESS_PAYLOAD,
         "decision": "deny",
         "decision_reasons": ["kyc_required", "sanctions_flagged"],
         "on_the_fly": False,
@@ -1149,7 +1023,7 @@ def test_poll_session_complete():
     client = AgentScore(api_key=API_KEY)
     result = client.poll_session("ses_abc123", "ps_secret456")
     assert result["status"] == "complete"
-    assert result["score"]["grade"] == "B"
+    assert result["decision"] == "allow"
     assert result["decision"] == "allow"
 
 
@@ -1382,7 +1256,7 @@ async def test_apoll_session_success():
     client = AgentScore(api_key=API_KEY)
     result = await client.apoll_session("ses_abc123", "ps_secret456")
     assert result["status"] == "complete"
-    assert result["score"]["grade"] == "B"
+    assert result["decision"] == "allow"
     await client.aclose()
 
 
@@ -2405,31 +2279,19 @@ def test_error_body_error_field_not_dict_keeps_defaults():
 def test_sync_client_is_reused_across_calls():
     """The second call must reuse the cached httpx.Client instance (the `is not None`
     branch of `_get_sync_client`)."""
-    respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(return_value=httpx.Response(200, json=REPUTATION_PAYLOAD))
+    respx.post(f"{BASE_URL}/v1/assess").mock(return_value=httpx.Response(200, json=ASSESS_PAYLOAD))
     client = AgentScore(api_key=API_KEY)
-    client.get_reputation(ADDRESS)
+    client.assess(ADDRESS)
     first = client._sync_client
     assert first is not None
-    client.get_reputation(ADDRESS)
+    client.assess(ADDRESS)
     assert client._sync_client is first
     client.close()
 
 
 # ---------------------------------------------------------------------------
-# Branch coverage: aget_reputation chain param + aassess optional-arg branches
+# Branch coverage: aassess optional-arg branches
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_aget_reputation_with_chain():
-    route = respx.get(f"{BASE_URL}/v1/reputation/{ADDRESS}").mock(
-        return_value=httpx.Response(200, json=REPUTATION_PAYLOAD)
-    )
-    client = AgentScore(api_key=API_KEY)
-    await client.aget_reputation(ADDRESS, chain="base")
-    assert "chain=base" in str(route.calls.last.request.url)
-    await client.aclose()
 
 
 @pytest.mark.asyncio
