@@ -18,13 +18,6 @@ from agentscore import AgentScore
 
 client = AgentScore(api_key="as_live_...")
 
-# Look up cached reputation (free)
-rep = client.get_reputation("0x1234...")
-print(rep["score"]["value"], rep["score"]["grade"])
-
-# Filter to a specific chain
-base_rep = client.get_reputation("0x1234...", chain="base")
-
 # Identity gate with policy (paid)
 gated = client.assess(
     "0x1234...",
@@ -39,9 +32,8 @@ if gated["decision"] == "deny":
     print(gated["decision_reasons"])  # ["kyc_required"]
     print(gated.get("verify_url"))  # URL for operator verification
 
-# Check verification level
-rep = client.get_reputation("0x1234...")
-print(rep.get("verification_level"))  # "none" | "wallet_claimed" | "kyc_verified"
+# Verification level of the operator behind the wallet
+print(gated["operator_verification"]["level"])  # "none" | "kyc_verified"
 ```
 
 ### Credential-Based Identity
@@ -75,7 +67,7 @@ client.create_session(kind="sign_in")  # registration-only: account sign-in, no 
 
 ### Wallet resolution
 
-`assess()` responses include `resolved_operator` and `linked_wallets`, all same-operator sibling wallets (claimed via SIWE or captured via prior `associate_wallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` and `get_reputation()` accepts either format; the network is auto-detected from the address shape.
+`assess()` responses include `resolved_operator` and `linked_wallets`, all same-operator sibling wallets (claimed via SIWE or captured via prior `associate_wallet`). The list may mix EVM addresses (`0x...` lowercased) and Solana addresses (base58, case-preserved) for cross-chain operators; merchants doing wallet-signer-match checks should accept a payment signed by any address in the list, regardless of chain. The `address` parameter on `assess()` accepts either format; the network is auto-detected from the address shape.
 
 ### Server-side signer-match + sanctions screening
 
@@ -138,7 +130,6 @@ All methods have async variants prefixed with `a`:
 
 ```python
 async with AgentScore(api_key="as_live_...") as client:
-    rep = await client.aget_reputation("0x1234...")
     result = await client.aassess("0x1234...", policy={"require_kyc": True})
 
     # Identity model methods
@@ -158,7 +149,7 @@ async with AgentScore(api_key="as_live_...") as client:
 
 ```python
 with AgentScore(api_key="as_live_...") as client:
-    rep = client.get_reputation("0x1234...")
+    result = client.assess("0x1234...")
 ```
 
 ## Configuration
@@ -178,7 +169,7 @@ with AgentScore(api_key="as_live_...") as client:
 from agentscore import AgentScore, AgentScoreError
 
 try:
-    rep = client.get_reputation("0xinvalid")
+    client.assess("0xinvalid")
 except AgentScoreError as e:
     print(e.code, e.status_code, str(e))
 ```

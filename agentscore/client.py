@@ -141,7 +141,6 @@ if TYPE_CHECKING:
         CredentialRevokeResponse,
         DecisionPolicy,
         Network,
-        ReputationResponse,
         SessionCreateResponse,
         SessionPollResponse,
         Signer,
@@ -247,14 +246,6 @@ class AgentScore:
 
     # --- Sync methods ---
 
-    def get_reputation(self, address: str, chain: str | None = None) -> ReputationResponse:
-        """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
-        params: dict[str, str] = {}
-        if chain:
-            params["chain"] = chain
-        client = self._get_sync_client()
-        return self._send_sync(lambda: client.get(f"/v1/reputation/{address}", params=params))
-
     def assess(
         self,
         address: str | None = None,
@@ -310,7 +301,7 @@ class AgentScore:
         operator_token: str | None = None,
         kind: Literal["kyc", "sign_in"] | None = None,
     ) -> SessionCreateResponse:
-        """Create an assessment session for deferred scoring.
+        """Create a verification or sign-in session.
 
         ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
         Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
@@ -404,14 +395,6 @@ class AgentScore:
 
     # --- Async methods ---
 
-    async def aget_reputation(self, address: str, chain: str | None = None) -> ReputationResponse:
-        """Get cached reputation for an address (free, read-only). Optionally filter by chain."""
-        params: dict[str, str] = {}
-        if chain:
-            params["chain"] = chain
-        client = self._get_async_client()
-        return await self._send_async(lambda: client.get(f"/v1/reputation/{address}", params=params))
-
     async def aassess(
         self,
         address: str | None = None,
@@ -460,7 +443,7 @@ class AgentScore:
         operator_token: str | None = None,
         kind: Literal["kyc", "sign_in"] | None = None,
     ) -> SessionCreateResponse:
-        """Create an assessment session for deferred scoring.
+        """Create a verification or sign-in session.
 
         ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
         Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
