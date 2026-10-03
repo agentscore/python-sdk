@@ -58,11 +58,8 @@ status = client.poll_session(session["session_id"], session["poll_secret"])
 if status["status"] == "verified":
     print(status["operator_token"])  # "opc_...", use for future requests
 
-# Optional pre-association: attach the session to a known wallet or refresh KYC
-# for an existing operator credential.
-client.create_session(address="0x...")
-client.create_session(operator_token="opc_...")  # KYC refresh
-client.create_session(kind="sign_in")  # registration-only: account sign-in, no identity documents
+# Registration-only session: the buyer signs in with an AgentScore account, no identity documents.
+client.create_session(kind="sign_in")
 ```
 
 ### Wallet resolution

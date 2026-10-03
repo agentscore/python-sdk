@@ -257,7 +257,9 @@ class AgentScore:
         aip_token: str | None = None,
         aip_signature: AipSignatureMaterial | None = None,
     ) -> AssessResponse:
-        """Assess a wallet or operator (paid, writes score on-the-fly).
+        """Assess a wallet or operator against a compliance policy.
+
+        ``refresh`` is deprecated: the API ignores it, and every assess is evaluated live.
 
         ``signer`` opts into server-side wallet-signer-match: when supplied,
         the API resolves the signer wallet against the claimed ``address`` and emits
@@ -303,9 +305,8 @@ class AgentScore:
     ) -> SessionCreateResponse:
         """Create a verification or sign-in session.
 
-        ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
-        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...``:
-        e.g. refresh KYC for a credential. ``kind`` selects the session kind: ``"kyc"``
+        ``address`` and ``operator_token`` are deprecated: the API ignores them, so a
+        session is never pre-associated with a wallet or credential. ``kind`` selects the session kind: ``"kyc"``
         (the API default) runs identity verification; ``"sign_in"`` is registration-only
         (the buyer signs in with an AgentScore account, no identity documents) and mints a
         ``sign_in``-scoped credential, for merchants that key durable state on the account
@@ -406,7 +407,9 @@ class AgentScore:
         aip_token: str | None = None,
         aip_signature: AipSignatureMaterial | None = None,
     ) -> AssessResponse:
-        """Assess a wallet or operator (paid, writes score on-the-fly).
+        """Assess a wallet or operator against a compliance policy.
+
+        ``refresh`` is deprecated: the API ignores it, and every assess is evaluated live.
 
         ``signer`` opts into server-side wallet-signer-match; ``aip_token`` (+ ``aip_signature``)
         supplies an AIP Agent Identity Token. Async mirror of :meth:`assess`.
@@ -445,9 +448,8 @@ class AgentScore:
     ) -> SessionCreateResponse:
         """Create a verification or sign-in session.
 
-        ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
-        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...``:
-        e.g. refresh KYC for a credential. ``kind`` selects the session kind: ``"kyc"``
+        ``address`` and ``operator_token`` are deprecated: the API ignores them, so a
+        session is never pre-associated with a wallet or credential. ``kind`` selects the session kind: ``"kyc"``
         (the API default) runs identity verification; ``"sign_in"`` is registration-only
         (the buyer signs in with an AgentScore account, no identity documents) and mints a
         ``sign_in``-scoped credential, for merchants that key durable state on the account
