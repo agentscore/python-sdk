@@ -63,7 +63,8 @@ include = ["agentscore"]
 required-version = ">=0.11.0"
 # An unbounded transitive requirement lets a routine refresh resolve a BETA and
 # drag a subtree with it, and the tests pass either way, so nothing reports it.
-# That is how python-commerce once resolved web3 8.0.0b3 through three
-# unbounded parents. Blocking prereleases outright beats pinning whichever
-# package surfaced last, since the same shape exists on several transitives.
-prerelease = "disallow"
+# `if-necessary` admits a prerelease only for a package that has never shipped
+# a stable release; a package that reaches for a beta it does not need gets its
+# own constraint (python-commerce pins web3 below 8). A blanket `disallow` also
+# refuses the never-stable packages and silently holds back whatever needs them.
+prerelease = "if-necessary"
