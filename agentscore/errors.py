@@ -12,7 +12,7 @@ class AgentScoreError(Exception):
         super().__init__(message)
         self.code = code
         self.status_code = status_code
-        # Response-body fields beyond `error.{code,message}` — e.g. verify_url,
+        # Response-body fields beyond `error.{code,message}`: e.g. verify_url,
         # linked_wallets, claimed_operator, actual_signer, reasons. Consumers
         # branch on these for granular recovery. Defaults to {} so callers
         # constructing this error by hand without a body can omit it.
@@ -25,17 +25,17 @@ class AgentScoreError(Exception):
 
 
 class PaymentRequiredError(AgentScoreError):
-    """HTTP 402 — the endpoint is not enabled for this account."""
+    """HTTP 402: the endpoint is not enabled for this account."""
 
     def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
         super().__init__("payment_required", message, 402, details)
 
 
 class TokenExpiredError(AgentScoreError):
-    """HTTP 401 with ``error.code = 'token_expired'`` — credential is no longer valid.
+    """HTTP 401 with ``error.code = 'token_expired'``: credential is no longer valid.
 
     Covers both revoked and TTL-expired credentials; the API does not distinguish
-    which. Body carries an auto-minted verification session — exposed here so callers recover
+    which. Body carries an auto-minted verification session: exposed here so callers recover
     without re-parsing ``details``.
     """
 
@@ -51,7 +51,7 @@ class TokenExpiredError(AgentScoreError):
 
 
 class InvalidCredentialError(AgentScoreError):
-    """HTTP 401 with ``error.code = 'invalid_credential'`` — operator_token doesn't exist.
+    """HTTP 401 with ``error.code = 'invalid_credential'``: operator_token doesn't exist.
 
     Permanent: no auto-session is issued. Caller should switch tokens or restart.
     """
@@ -61,7 +61,7 @@ class InvalidCredentialError(AgentScoreError):
 
 
 class QuotaExceededError(AgentScoreError):
-    """HTTP 429 with ``error.code = 'quota_exceeded'`` — account-level cap reached.
+    """HTTP 429 with ``error.code = 'quota_exceeded'``: account-level cap reached.
 
     Don't retry; the cap won't lift through retry alone. Distinct from per-second
     :class:`RateLimitedError`.
@@ -72,7 +72,7 @@ class QuotaExceededError(AgentScoreError):
 
 
 class RateLimitedError(AgentScoreError):
-    """HTTP 429 with ``error.code = 'rate_limited'`` — per-second sliding-window cap hit.
+    """HTTP 429 with ``error.code = 'rate_limited'``: per-second sliding-window cap hit.
 
     Retry after the interval indicated by the ``Retry-After`` header (typically <= 1s).
     """

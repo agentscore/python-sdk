@@ -40,12 +40,12 @@ class Signer(TypedDict):
     When passed to ``assess()`` / ``aassess()``, the API resolves this signer wallet
     against the claimed ``address`` and emits a ``signer_match`` block on the response.
     Lets commerce gates collapse the legacy 2 follow-up assess calls (one per wallet)
-    into the gate's primary assess call. Strictly additive — old clients that don't
+    into the gate's primary assess call. Strictly additive: old clients that don't
     pass this field see no ``signer_match`` on the response.
     """
 
     # Recovered payment-signer wallet. ``None`` indicates the rail carries no wallet
-    # signature (Stripe SPT, card) — produces
+    # signature (Stripe SPT, card): produces
     # ``signer_match.kind = "wallet_auth_requires_wallet_signing"``.
     address: str | None
     # Key-derivation family of the signer wallet.
@@ -63,24 +63,24 @@ class SignerMatch(TypedDict):
     ``kind`` is always present; other fields depend on which kind was emitted.
     """
 
-    # ``pass`` — claimed wallet and signer wallet resolve to the same operator (or are
-    # byte-equal). ``wallet_signer_mismatch`` — operators differ.
-    # ``wallet_auth_requires_wallet_signing`` — request supplied ``address: None`` (rail
+    # ``pass``: claimed wallet and signer wallet resolve to the same operator (or are
+    # byte-equal). ``wallet_signer_mismatch``: operators differ.
+    # ``wallet_auth_requires_wallet_signing``: request supplied ``address: None`` (rail
     # has no wallet signer); agent should switch to operator_token auth.
     kind: Literal["pass", "wallet_signer_mismatch", "wallet_auth_requires_wallet_signing"]
     # Operator the claimed wallet resolves to. ``None`` if unlinked.
     claimed_operator: NotRequired[str | None]
     # Operator the signer wallet resolves to. ``None`` if unlinked.
     signer_operator: NotRequired[str | None]
-    # Echoed only on ``wallet_auth_requires_wallet_signing`` — the claimed wallet from
+    # Echoed only on ``wallet_auth_requires_wallet_signing``: the claimed wallet from
     # the request. Helps agents construct the recovery message.
     claimed_wallet: NotRequired[str]
-    # Echoed on ``wallet_signer_mismatch`` — the claimed wallet, normalized.
+    # Echoed on ``wallet_signer_mismatch``: the claimed wallet, normalized.
     expected_signer: NotRequired[str]
-    # Echoed on ``wallet_signer_mismatch`` — the signer wallet, normalized.
+    # Echoed on ``wallet_signer_mismatch``: the signer wallet, normalized.
     actual_signer: NotRequired[str]
     # Same-operator linked wallets the agent could re-sign from to satisfy the claim.
-    # Mirrors the top-level ``linked_wallets`` deny-guard — omitted on ``deny`` verdicts.
+    # Mirrors the top-level ``linked_wallets`` deny-guard: omitted on ``deny`` verdicts.
     linked_wallets: NotRequired[list[str]]
     # JSON-encoded ``{action, steps, user_message}`` envelope for SDK denial bodies.
     # SDK consumers spread this into their 403
@@ -89,13 +89,13 @@ class SignerMatch(TypedDict):
 
 
 class SignerSanctionsClear(TypedDict):
-    """Server-side wallet-sanctions verdict — address NOT on the OFAC SDN list."""
+    """Server-side wallet-sanctions verdict: address NOT on the OFAC SDN list."""
 
     status: Literal["clear"]
 
 
 class SignerSanctionsHit(TypedDict):
-    """Server-side wallet-sanctions verdict — address IS on the OFAC SDN list.
+    """Server-side wallet-sanctions verdict: address IS on the OFAC SDN list.
 
     Wallet-OFAC enforcement on the ``signer`` block is unconditional whenever
     a signer is supplied. This verdict flips the response ``decision`` to
@@ -119,7 +119,7 @@ class SignerSanctionsHit(TypedDict):
 
 
 class SignerSanctionsUnavailable(TypedDict):
-    """Server-side wallet-sanctions verdict — lookup itself failed.
+    """Server-side wallet-sanctions verdict: lookup itself failed.
 
     Fail-closed: the gate denies whenever a signer was supplied and the OFAC
     lookup couldn't resolve, because OFAC sanctions screening is strict-liability.
@@ -240,7 +240,7 @@ class SessionCreateRequest(TypedDict, total=False):
 class SessionCreateNextSteps(TypedDict, total=False):
     """Structured action guidance on POST /v1/sessions success.
 
-    action is always ``deliver_verify_url_and_poll`` — tells the agent to share verify_url
+    action is always ``deliver_verify_url_and_poll``: tells the agent to share verify_url
     with the user and poll poll_url with X-Poll-Secret until an operator_token is issued.
     """
 
@@ -384,27 +384,27 @@ DenialCode = Literal[
     # Gate-emitted codes from commerce middleware (canonical 9-element union)
     "missing_identity",
     "identity_verification_required",
-    # Credential is no longer valid (revoked or past its TTL — the two cases share this
+    # Credential is no longer valid (revoked or past its TTL: the two cases share this
     # code deliberately so the API doesn't leak which one). The 401 body carries an
     # auto-minted session so agents recover without holding an API key.
     "token_expired",
     # Credential doesn't exist at all (typo, fabricated, never minted). Permanent state;
     # no auto-session is issued because the agent may have other valid tokens to try.
     "invalid_credential",
-    # Wallet-signer binding — claimed X-Wallet-Address must resolve to the same operator
+    # Wallet-signer binding: claimed X-Wallet-Address must resolve to the same operator
     # as the payment signer; wallet-auth is rejected on rails with no wallet signer.
     "wallet_signer_mismatch",
     "wallet_auth_requires_wallet_signing",
     "wallet_not_trusted",
     "api_error",
     "payment_required",
-    # Merchant-emitted convenience codes — not emitted by the AgentScore API itself,
+    # Merchant-emitted convenience codes: not emitted by the AgentScore API itself,
     # but may appear in 4xx bodies passing through the SDK from merchants whose gate
     # `on_denied` hook wraps AgentScore denials into business-domain codes.
     "operator_verification_required",
     "compliance_denied",
     "compliance_error",
-    # Decision-reason code surfaced in error.code by some merchants — kept for back-compat
+    # Decision-reason code surfaced in error.code by some merchants: kept for back-compat
     # with merchants that flatten policy reasons into the error envelope.
     "kyc_required",
 ]
@@ -422,15 +422,15 @@ NextStepsAction = Literal[
     "done",
     "use_operator_token",
     "regenerate_payment_from_linked_wallet",
-    # Gate-emitted probe strategy — try wallet on signing rails, fall back to stored
+    # Gate-emitted probe strategy: try wallet on signing rails, fall back to stored
     # opc_..., fall back to session flow. Emitted on bare missing_identity 403s.
     "probe_identity_then_session",
-    # Wallet signer mismatch — re-sign from expected_signer / any linked_wallets entry,
+    # Wallet signer mismatch: re-sign from expected_signer / any linked_wallets entry,
     # or drop X-Wallet-Address and retry with X-Operator-Token.
     "resign_or_switch_to_operator_token",
-    # Non-signing rail (Stripe SPT, card) — drop X-Wallet-Address, use X-Operator-Token.
+    # Non-signing rail (Stripe SPT, card): drop X-Wallet-Address, use X-Operator-Token.
     "switch_to_operator_token",
-    # POST /v1/sessions success — deliver verify_url + poll poll_url.
+    # POST /v1/sessions success: deliver verify_url + poll poll_url.
     "deliver_verify_url_and_poll",
     # Session poll states.
     "continue_polling",
@@ -453,7 +453,7 @@ class AgentMemoryHint(TypedDict):
     """Structured hint emitted on bootstrap denials and POST /v1/sessions success.
 
     LLM-hosted agents should save this to their long-term memory so future AgentScore encounters
-    skip the cold-start session flow. Contents are the pattern, not secrets —
+    skip the cold-start session flow. Contents are the pattern, not secrets:
     do_not_persist_in_memory names bearer credentials that belong in a credential store.
     """
 
