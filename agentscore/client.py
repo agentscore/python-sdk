@@ -111,7 +111,7 @@ def _build_error_from_response(response: httpx.Response) -> AgentScoreError:
             # verify_url, linked_wallets, reasons, etc. for granular denial recovery.
             details = {k: v for k, v in body.items() if k != "error"}
     except ValueError:
-        # Body wasn't JSON or didn't have the expected shape — keep defaults.
+        # Body wasn't JSON or didn't have the expected shape: keep defaults.
         pass
 
     if response.status_code == 402:
@@ -304,7 +304,7 @@ class AgentScore:
         """Create a verification or sign-in session.
 
         ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
-        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
+        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...``:
         e.g. refresh KYC for a credential. ``kind`` selects the session kind: ``"kyc"``
         (the API default) runs identity verification; ``"sign_in"`` is registration-only
         (the buyer signs in with an AgentScore account, no identity documents) and mints a
@@ -368,20 +368,20 @@ class AgentScore:
     ) -> AssociateWalletResponse:
         """Report that a wallet paid under an operator credential.
 
-        ``network`` is the key-derivation family (``"evm"`` or ``"solana"``) — EVM EOAs share
+        ``network`` is the key-derivation family (``"evm"`` or ``"solana"``): EVM EOAs share
         identity across every EVM chain (Base, Tempo, Ethereum, …) so one value covers them all.
 
-        ``idempotency_key`` is optional — pass a stable per-payment key (e.g., payment intent id,
+        ``idempotency_key`` is optional: pass a stable per-payment key (e.g., payment intent id,
         x402 tx hash) so agent retries of the same logical payment don't inflate transaction_count.
 
-        Fire-and-forget friendly — the returned ``first_seen`` boolean is informational only.
+        Fire-and-forget friendly: the returned ``first_seen`` boolean is informational only.
         """
         body: dict[str, Any] = {
             "operator_token": operator_token,
             "wallet_address": wallet_address,
             "network": network,
         }
-        # Truthy check (not `is not None`) so empty strings don't ship a useless key —
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key:
         # only forward when the key actually has content.
         if idempotency_key:
             if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
@@ -446,7 +446,7 @@ class AgentScore:
         """Create a verification or sign-in session.
 
         ``address`` pre-associates the session with a known wallet (EVM ``0x...`` or
-        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...`` —
+        Solana base58). ``operator_token`` pre-associates with an existing ``opc_...``:
         e.g. refresh KYC for a credential. ``kind`` selects the session kind: ``"kyc"``
         (the API default) runs identity verification; ``"sign_in"`` is registration-only
         (the buyer signs in with an AgentScore account, no identity documents) and mints a
@@ -514,7 +514,7 @@ class AgentScore:
             "wallet_address": wallet_address,
             "network": network,
         }
-        # Truthy check (not `is not None`) so empty strings don't ship a useless key —
+        # Truthy check (not `is not None`) so empty strings don't ship a useless key:
         # only forward when the key actually has content.
         if idempotency_key:
             if len(idempotency_key) > _IDEMPOTENCY_KEY_MAX:
@@ -527,7 +527,7 @@ class AgentScore:
         return await self._send_async(lambda: client.post("/v1/credentials/wallets", json=body))
 
     def telemetry_signer_match(self, payload: dict[str, Any]) -> None:
-        """Fire-and-forget telemetry — report a wallet-signer-match verdict.
+        """Fire-and-forget telemetry: report a wallet-signer-match verdict.
 
         Tracks aggregate signer-binding behavior across merchants. Does not raise;
         failures are logged at warning level so persistent telemetry outages are visible

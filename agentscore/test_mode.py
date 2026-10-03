@@ -2,7 +2,7 @@
 
 AgentScore's ``/v1/assess`` endpoint recognizes seven EVM addresses
 (``0x0000…0001`` through ``0x0000…0007``) as test fixtures with deterministic
-policy outcomes — KYC verified, sanctions clear, age gates passing — so dev/test
+policy outcomes (KYC verified, sanctions clear, age gates passing) so dev/test
 interactions don't burn real KYC credits and produce predictable results.
 
 Use this in test suites and dev/staging tooling to label test-mode interactions

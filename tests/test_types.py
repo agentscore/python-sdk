@@ -110,6 +110,6 @@ def test_session_create_response_accepts_agent_memory() -> None:
 
 
 def test_sdk_exports_new_symbols() -> None:
-    # Importability check — covered above via imports, but also guard the AgentScore class itself.
+    # Importability check: covered above via imports, but also guard the AgentScore class itself.
     assert AgentScore is not None
     assert AgentScoreError is not None

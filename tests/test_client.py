@@ -674,7 +674,7 @@ def test_connect_error_raises_agentscore_error():
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
         client.list_credentials()
-    # All httpx-layer errors (Timeout, Connect, Protocol, Network) are wrapped — parity with node-sdk.
+    # All httpx-layer errors (Timeout, Connect, Protocol, Network) are wrapped: parity with node-sdk.
     # ConnectError specifically maps to network_error; TimeoutException is the only one that becomes TimeoutError.
     assert exc_info.value.code == "network_error"
     assert exc_info.value.status_code == 0
@@ -1413,7 +1413,7 @@ def test_associate_wallet_omits_idempotency_key_when_not_provided():
 
 @respx.mock
 def test_associate_wallet_omits_empty_string_idempotency_key():
-    """Empty string is not a valid key — match node-sdk behavior and skip forwarding."""
+    """Empty string is not a valid key: match node-sdk behavior and skip forwarding."""
     route = respx.post(f"{BASE_URL}/v1/credentials/wallets").mock(
         return_value=httpx.Response(200, json={"associated": True, "first_seen": True}),
     )
@@ -1800,7 +1800,7 @@ def test_unknown_4xx_falls_through_to_generic_agentscore_error():
     client = AgentScore(api_key=API_KEY)
     with pytest.raises(AgentScoreError) as exc_info:
         client.assess(address=ADDRESS)
-    # Not a typed subclass — generic AgentScoreError.
+    # Not a typed subclass: generic AgentScoreError.
     assert type(exc_info.value) is AgentScoreError
     assert exc_info.value.status_code == 403
     assert exc_info.value.code == "account_cancelled"
@@ -2119,7 +2119,7 @@ def test_unknown_400_invalid_request_falls_through_to_generic_agentscore_error()
     assert not isinstance(err, QuotaExceededError)
     assert not isinstance(err, RateLimitedError)
     assert not isinstance(err, AgentScoreTimeoutError)
-    # Generic — type is exactly AgentScoreError, not a subclass.
+    # Generic: type is exactly AgentScoreError, not a subclass.
     assert type(err) is AgentScoreError
     assert err.code == "invalid_request"
     assert err.status_code == 400
@@ -2129,7 +2129,7 @@ def test_unknown_400_invalid_request_falls_through_to_generic_agentscore_error()
 @respx.mock
 def test_token_expired_error_fields_undefined_when_api_omits_them():
     """If API returns 401 token_expired with no verify_url / session_id / poll_secret /
-    next_steps / agent_memory in the body, the instance fields stay None — error is still
+    next_steps / agent_memory in the body, the instance fields stay None: error is still
     a TokenExpiredError (not falling through to generic)."""
     from agentscore.errors import TokenExpiredError
 
@@ -2169,7 +2169,7 @@ def test_token_expired_error_ignores_wrong_typed_body_fields():
     with pytest.raises(TokenExpiredError) as exc_info:
         client.assess(address=ADDRESS)
     err = exc_info.value
-    # Strings only — wrong types ignored, instance fields stay None.
+    # Strings only: wrong types ignored, instance fields stay None.
     assert err.verify_url is None
     assert err.session_id is None
     # Raw values still in details for inspection.
@@ -2339,7 +2339,7 @@ async def test_aassess_forwards_chain_refresh_and_policy():
 @pytest.mark.asyncio
 @respx.mock
 async def test_acreate_credential_omits_unset_fields():
-    """Both `label` and `ttl_days` default to None — the body must stay empty (covers the
+    """Both `label` and `ttl_days` default to None: the body must stay empty (covers the
     falsy side of both `is not None` branches)."""
     route = respx.post(f"{BASE_URL}/v1/credentials").mock(
         return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD)
@@ -2354,7 +2354,7 @@ async def test_acreate_credential_omits_unset_fields():
 @pytest.mark.asyncio
 @respx.mock
 async def test_acreate_credential_forwards_label_and_ttl():
-    """Truthy side of both branches — label and ttl_days are forwarded."""
+    """Truthy side of both branches: label and ttl_days are forwarded."""
     route = respx.post(f"{BASE_URL}/v1/credentials").mock(
         return_value=httpx.Response(200, json=CREDENTIAL_CREATE_PAYLOAD)
     )
