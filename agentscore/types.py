@@ -190,8 +190,8 @@ class QuotaInfo(TypedDict):
 
     limit: int | None
     used: int | None
-    # ``X-Quota-Reset`` is an ISO-8601 timestamp, or the literal string "never" for lifetime
-    # caps. The API emits "never" for tiers without a reset.
+    # ``X-Quota-Reset`` is the UTC date (``YYYY-MM-DD``) the calendar-month quota resets,
+    # e.g. "2026-06-01", or "never" when the API has no reset date for the account.
     reset: str | None
 
 
