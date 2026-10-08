@@ -133,7 +133,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from agentscore.types import (
-        AipSignatureMaterial,
         AssessResponse,
         AssociateWalletResponse,
         CredentialCreateResponse,
@@ -254,8 +253,6 @@ class AgentScore:
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
         signer: Signer | None = None,
-        aip_token: str | None = None,
-        aip_signature: AipSignatureMaterial | None = None,
     ) -> AssessResponse:
         """Assess a wallet or operator against a compliance policy.
 
@@ -264,22 +261,12 @@ class AgentScore:
         ``signer`` opts into server-side wallet-signer-match: when supplied,
         the API resolves the signer wallet against the claimed ``address`` and emits
         a ``signer_match`` block on the response. See :class:`Signer`.
-
-        ``aip_token`` (+ ``aip_signature``) supplies an AIP Agent Identity Token in place of
-        ``address`` / ``operator_token``: the API re-verifies the issuer signature, the RFC 9421
-        proof-of-possession, and the attested claims, then evaluates policy against them.
         """
         body: dict[str, Any] = {}
         if address:
             body["address"] = address
         if operator_token:
             body["operator_token"] = operator_token
-        # AIP Agent Identity Token path: the API re-verifies the IdP signature + claims
-        # server-side and evaluates policy against the attested identity.
-        if aip_token:
-            body["aip_token"] = aip_token
-        if aip_signature is not None:
-            body["aip_signature"] = dict(aip_signature)
         if chain:
             body["chain"] = chain
         if refresh is not None:
@@ -404,25 +391,18 @@ class AgentScore:
         policy: DecisionPolicy | None = None,
         operator_token: str | None = None,
         signer: Signer | None = None,
-        aip_token: str | None = None,
-        aip_signature: AipSignatureMaterial | None = None,
     ) -> AssessResponse:
         """Assess a wallet or operator against a compliance policy.
 
         ``refresh`` is deprecated: the API ignores it, and every assess is evaluated live.
 
-        ``signer`` opts into server-side wallet-signer-match; ``aip_token`` (+ ``aip_signature``)
-        supplies an AIP Agent Identity Token. Async mirror of :meth:`assess`.
+        ``signer`` opts into server-side wallet-signer-match. Async mirror of :meth:`assess`.
         """
         body: dict[str, Any] = {}
         if address:
             body["address"] = address
         if operator_token:
             body["operator_token"] = operator_token
-        if aip_token:
-            body["aip_token"] = aip_token
-        if aip_signature is not None:
-            body["aip_signature"] = dict(aip_signature)
         if chain:
             body["chain"] = chain
         if refresh is not None:

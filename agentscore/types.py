@@ -132,43 +132,10 @@ class SignerSanctionsUnavailable(TypedDict):
 SignerSanctions = SignerSanctionsClear | SignerSanctionsHit | SignerSanctionsUnavailable
 
 
-class AipSignatureMaterial(TypedDict):
-    """RFC 9421 HTTP Message Signature material proving possession of the AIT-bound ``cnf`` key.
-
-    Forwarded alongside ``aip_token`` so ``/v1/assess`` can re-verify proof-of-possession
-    authoritatively; the API never sees the original agent-to-merchant request itself.
-    """
-
-    method: str  # HTTP method of the original agent-to-merchant request (``@method``)
-    authority: str  # Authority/host the agent signed (``@authority``)
-    path: str  # Request path the agent signed (``@path``)
-    signature_input: str  # Raw ``Signature-Input`` header value the agent sent
-    signature: str  # Raw ``Signature`` header value the agent sent
-
-
-class _AipProvenanceRequired(TypedDict):
-    issuer: str  # Canonical issuer URL of the AIT
-    subject: str  # The token's ``sub``: the IdP's subject identifier for the verified human
-
-
-class AipProvenance(_AipProvenanceRequired, total=False):
-    """Provenance block returned when the identity input was an AIP Agent Identity Token.
-
-    Surfaces which issuer attested the identity and the trust level it asserted.
-    """
-
-    trust_level: Literal["autonomous", "human_present", "human_confirmed"]
-    agent_provider: str
-    # True when /v1/assess re-verified the RFC 9421 proof-of-possession. Always true on a
-    # success response: the API fail-closes with an HTTP 400/401 error (not a 200 deny)
-    # when possession can't be proven.
-    pop_verified: bool
-
-
 class _AssessResponseRequired(TypedDict):
     decision: str | None
     decision_reasons: list[str]
-    identity_method: Literal["wallet", "operator_token", "aip_token"]
+    identity_method: Literal["wallet", "operator_token"]
 
 
 class PolicyExplanation(TypedDict, total=False):
@@ -223,8 +190,6 @@ class AssessResponse(_AssessResponseRequired, total=False):
     # Server-side OFAC SDN wallet-address verdict, returned only when the request supplied
     # ``signer``. Empty otherwise.
     signer_sanctions: NotRequired[SignerSanctions]
-    # Issuer provenance, returned only when ``identity_method == "aip_token"``.
-    aip: NotRequired[AipProvenance]
     # Quota state for this account, captured from response headers on the success path.
     # Use to monitor approach-to-cap proactively (warn at 80%, alert at 95%) before 429.
     quota: NotRequired[QuotaInfo]
@@ -446,7 +411,6 @@ NextStepsAction = Literal[
 class AgentMemoryIdentityPaths(TypedDict):
     wallet: str
     operator_token: str
-    agent_identity: NotRequired[str]
 
 
 class AgentMemoryHint(TypedDict):
@@ -463,8 +427,6 @@ class AgentMemoryHint(TypedDict):
     identity_check_endpoint: str
     list_wallets_endpoint: NotRequired[str]
     identity_paths: AgentMemoryIdentityPaths
-    # Issuer allowlist a merchant accepts for AIP Agent Identity Tokens, when advertised.
-    aip_trusted_issuers: NotRequired[list[str]]
     bootstrap: str
     do_not_persist_in_memory: list[str]
     persist_in_credential_store: list[str]
