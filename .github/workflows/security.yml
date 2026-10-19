@@ -38,10 +38,10 @@ jobs:
       - uses: useblacksmith/checkout@v1
       - uses: astral-sh/setup-uv@v10.3.0
         with:
-          version: "0.13.0"
+          version: "0.13.1"
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
 
       - name: Install pip-audit
         run: pip install pip-audit
