@@ -36,9 +36,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
-          version: "0.13.1"
+          version: "0.13.5"
       - uses: actions/setup-python@v7
         with:
           python-version: "3.15"

@@ -19,9 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.2
         with:
-          version: "0.13.1"
+          version: "0.13.5"
 
       - name: Set version from tag
         run: sed -i "s/^version = .*/version = \"${GITHUB_REF_NAME#v}\"/" pyproject.toml
@@ -29,7 +29,7 @@ jobs:
       - run: uv build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.2
+        uses: pypa/gh-action-pypi-publish@v1.14.3
 
       - name: Create GitHub Release
         run: gh release create "$GITHUB_REF_NAME" --generate-notes
