@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
       - run: uv python install 3.15
@@ -47,7 +47,7 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
       - run: uv python install ${{ matrix.python }}
